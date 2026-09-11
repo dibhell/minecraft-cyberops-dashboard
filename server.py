@@ -281,6 +281,10 @@ def rcon_command(cmd, timeout=3.0):
 # Differential CPU tracking
 prev_cpu_total = 0
 prev_cpu_idle = 0
+rapl_path = Path("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0")
+prev_rapl_energy = None
+prev_rapl_time = None
+rapl_session_joules = 0.0
 
 def get_cpu_percent():
     global prev_cpu_total, prev_cpu_idle
@@ -304,6 +308,25 @@ def get_cpu_percent():
     except Exception:
         pass
     return 0.0
+
+def rapl_delta_uj(previous, current, maximum):
+    return current - previous if current >= previous else maximum - previous + current
+
+def get_cpu_power():
+    global prev_rapl_energy, prev_rapl_time, rapl_session_joules
+    try:
+        now = time.monotonic()
+        energy = int((rapl_path / "energy_uj").read_text().strip())
+        maximum = int((rapl_path / "max_energy_range_uj").read_text().strip())
+        watts = None
+        if prev_rapl_energy is not None and now > prev_rapl_time:
+            joules = rapl_delta_uj(prev_rapl_energy, energy, maximum) / 1_000_000
+            rapl_session_joules += joules
+            watts = round(joules / (now - prev_rapl_time), 1)
+        prev_rapl_energy, prev_rapl_time = energy, now
+        return {"watts": watts, "session_kwh": round(rapl_session_joules / 3_600_000, 4), "source": "Intel RAPL (CPU)"}
+    except (OSError, ValueError):
+        return {"watts": None, "session_kwh": None, "source": "unavailable"}
 
 def get_temperatures():
     result = {"package": None, "cores": [], "sensors_raw": ""}
@@ -489,6 +512,7 @@ def telemetry_poller():
     while True:
         try:
             cpu = get_cpu_percent()
+            power = get_cpu_power()
             temp = get_temperatures()
             mem = get_memory_info()
             disk = get_disk_info()
@@ -513,6 +537,7 @@ def telemetry_poller():
                 telemetry_data["system"] = {
                     "hostname": "Grzybkowo",
                     "cpu_percent": cpu,
+                    "power": power,
                     "temp": temp,
                     "memory": mem,
                     "disk": disk,

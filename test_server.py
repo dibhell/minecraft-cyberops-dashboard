@@ -57,6 +57,10 @@ class ModUploadValidationTest(unittest.TestCase):
             packed.append(word)
         self.assertEqual(terrain.unpack_height(packed, 173, -64), 109)
 
+    def test_rapl_energy_delta_handles_counter_wrap(self):
+        self.assertEqual(server.rapl_delta_uj(900, 950, 1000), 50)
+        self.assertEqual(server.rapl_delta_uj(950, 25, 1000), 75)
+
 
 if __name__ == "__main__":
     unittest.main()

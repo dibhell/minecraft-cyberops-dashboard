@@ -7,6 +7,7 @@ Type=simple
 User=ptr
 Group=ptr
 WorkingDirectory=/opt/minecraft/dashboard
+ExecStartPre=+/bin/chmod a+r /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/energy_uj
 ExecStart=/usr/bin/python3 /opt/minecraft/dashboard/server.py
 Restart=always
 RestartSec=5

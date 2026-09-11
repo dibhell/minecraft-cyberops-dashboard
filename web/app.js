@@ -540,10 +540,9 @@ function renderTelemetry(data) {
   const cpuPct = sys.cpu_percent !== undefined ? sys.cpu_percent : 0;
   document.getElementById('cpuPercentVal').textContent = `${cpuPct}%`;
   document.getElementById('cpuBar').style.width = `${cpuPct}%`;
-  if (sys.load_avg) {
-    document.getElementById('load1mVal').textContent = sys.load_avg[0];
-    document.getElementById('load5mVal').textContent = sys.load_avg[1];
-  }
+  const power = sys.power || {};
+  document.getElementById('cpuPowerVal').textContent = power.watts !== null && power.watts !== undefined ? `${power.watts} W` : '-- W';
+  document.getElementById('cpuEnergyVal').textContent = power.session_kwh !== null && power.session_kwh !== undefined ? `${power.session_kwh} kWh` : '-- kWh';
   document.getElementById('sysUptimeVal').textContent = sys.uptime || '--';
 
   // Thermals
