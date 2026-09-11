@@ -1,0 +1,5 @@
+{
+  "mc_dir": "/opt/minecraft",
+  "sudo_pass": "YOUR_SUDO_PASSWORD_HERE",
+  "port": 8080
+}

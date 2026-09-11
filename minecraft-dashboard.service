@@ -1,0 +1,17 @@
+[Unit]
+Description=Minecraft Cyber-Ops Web Dashboard
+After=network.target minecraft.service
+
+[Service]
+Type=simple
+User=ptr
+Group=ptr
+WorkingDirectory=/opt/minecraft/dashboard
+ExecStart=/usr/bin/python3 /opt/minecraft/dashboard/server.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

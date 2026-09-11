@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRZYBKOWO // MINECRAFT CYBER-OPS CONSOLE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="crt-scanlines">
+  <!-- Audio Context Click Synthesizer -->
+  <div class="cyber-grid-bg"></div>
+  <div class="vignette-overlay"></div>
+
+  <div class="cyber-container">
+    <!-- TOP STATUS BAR -->
+    <header class="cyber-header">
+      <div class="header-left">
+        <div class="glitch-title" data-text="GRZYBKOWO // CYBER-OPS">GRZYBKOWO // CYBER-OPS</div>
+        <div class="header-subtitle">
+          <span class="badge-tag">FORGE 1.20.1</span>
+          <span class="badge-tag node-tag">NODE: 192.168.1.15</span>
+          <span class="badge-tag host-tag" id="hostTag">HOST: Grzybkowo</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="telemetry-pill">
+          <span class="pulse-dot" id="streamPulse"></span>
+          <span class="telemetry-text" id="streamStatus">LIVE TELEMETRY: CONNECTED</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="cyber-clock" id="cyberClock">00:00:00.000</div>
+        <div class="header-toggles">
+          <button id="toggleCrtBtn" class="cyber-btn-mini active" title="Przełącz efekt CRT/Scanlines">CRT [ON]</button>
+          <button id="toggleSfxBtn" class="cyber-btn-mini active" title="Dźwięki Web Audio">SFX [ON]</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- METRICS HUD -->
+    <section class="hud-grid">
+      <!-- MC Status Card -->
+      <div class="hud-card" id="cardMcStatus">
+        <div class="card-header">
+          <span class="card-tag">SYS.01</span>
+          <h3>MINECRAFT CORE</h3>
+          <span class="status-indicator" id="mcStatusBadge">CHECKING</span>
+        </div>
+        <div class="card-body">
+          <div class="big-metric" id="mcStatusText">ONLINE</div>
+          <div class="sub-metrics">
+            <div class="sub-metric-item">
+              <span class="lbl">PLAYERS:</span>
+              <span class="val highlight" id="mcPlayersVal">0 / 8</span>
+            </div>
+            <div class="sub-metric-item">
+              <span class="lbl">JVM PID:</span>
+              <span class="val" id="mcPidVal">--</span>
+            </div>
+            <div class="sub-metric-item">
+              <span class="lbl">JVM RAM:</span>
+              <span class="val highlight-cyan" id="mcJvmRamVal">-- MB</span>
+            </div>
+          </div>
+          <div class="player-chips" id="playerChipsContainer">
+            <!-- Active players list -->
+          </div>
+        </div>
+      </div>
+
+      <!-- CPU Card -->
+      <div class="hud-card">
+        <div class="card-header">
+          <span class="card-tag">SYS.02</span>
+          <h3>CPU PROCESSOR</h3>
+          <span class="card-tag" id="cpuModelTag">INTEL HOST</span>
+        </div>
+        <div class="card-body">
+          <div class="big-metric-row">
+            <div class="big-metric" id="cpuPercentVal">0%</div>
+            <div class="meter-container">
+              <div class="meter-bar" id="cpuBar" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="sub-metrics">
+            <div class="sub-metric-item">
+              <span class="lbl">LOAD 1M:</span>
+              <span class="val" id="load1mVal">0.00</span>
+            </div>
+            <div class="sub-metric-item">
+              <span class="lbl">LOAD 5M:</span>
+              <span class="val" id="load5mVal">0.00</span>
+            </div>
+            <div class="sub-metric-item">
+              <span class="lbl">UPTIME:</span>
+              <span class="val" id="sysUptimeVal">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- THERMAL Card -->
+      <div class="hud-card">
+        <div class="card-header">
+          <span class="card-tag">SYS.03</span>
+          <h3>THERMAL MATRIX</h3>
+          <span class="status-indicator" id="tempStatusBadge">OPTIMAL</span>
+        </div>
+        <div class="card-body">
+          <div class="big-metric-row">
+            <div class="big-metric highlight-amber" id="pkgTempVal">-- °C</div>
+            <div class="meter-container">
+              <div class="meter-bar temp-bar" id="tempBar" style="width: 50%"></div>
+            </div>
+          </div>
+          <div class="sub-metrics">
+            <div class="sub-metric-item">
+              <span class="lbl">CORE 0:</span>
+              <span class="val" id="core0TempVal">-- °C</span>
+            </div>
+            <div class="sub-metric-item">
+              <span class="lbl">CORE 1:</span>
+              <span class="val" id="core1TempVal">-- °C</span>
+            </div>
+            <div class="sub-metric-item">
+              <span class="lbl">CRIT LIMIT:</span>
+              <span class="val highlight-red">100 °C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MEMORY & DISK Card -->
+      <div class="hud-card">
+        <div class="card-header">
+          <span class="card-tag">SYS.04</span>
+          <h3>RAM & STORAGE</h3>
+          <span class="card-tag">16 GB DDR</span>
+        </div>
+        <div class="card-body">
+          <div class="memory-stat-row">
+            <div class="mem-label-row">
+              <span>RAM USAGE:</span>
+              <span id="ramTextVal">-- / -- GB (--%)</span>
+            </div>
+            <div class="meter-container">
+              <div class="meter-bar" id="ramBar" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="memory-stat-row" style="margin-top: 8px;">
+            <div class="mem-label-row">
+              <span>DISK (/opt/minecraft):</span>
+              <span id="diskTextVal">-- / -- GB</span>
+            </div>
+            <div class="meter-container">
+              <div class="meter-bar disk-bar" id="diskBar" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TACTICAL ACTION BAR -->
+    <section class="action-deck">
+      <div class="deck-title">
+        <span class="deck-accent">[ COMMAND_TRIGGER ]</span>
+        <span>KONTROLA USŁUGI MINECRAFT (systemd / SIGINT / SIGKILL)</span>
+      </div>
+      <div class="deck-buttons">
+        <button id="btnStart" class="cyber-btn btn-start" onclick="triggerServerAction('start')">
+          <span class="btn-icon">▶</span>
+          <span class="btn-text">URUCHOM SERWER</span>
+        </button>
+        <button id="btnRestart" class="cyber-btn btn-restart" onclick="triggerServerAction('restart')">
+          <span class="btn-icon">↺</span>
+          <span class="btn-text">RESTARTUJ SERWER</span>
+        </button>
+        <button id="btnStop" class="cyber-btn btn-stop" onclick="triggerServerAction('stop')">
+          <span class="btn-icon">■</span>
+          <span class="btn-text">ZATRZYMAJ (GRACEFUL)</span>
+        </button>
+        <button id="btnKill" class="cyber-btn btn-kill" onclick="triggerServerAction('kill')">
+          <span class="btn-icon">☠</span>
+          <span class="btn-text">FORCE KILL</span>
+        </button>
+      </div>
+
+      <!-- Quick RCON presets -->
+      <div class="quick-presets">
+        <span class="presets-label">SZYBKIE KOMENDY:</span>
+        <button class="preset-pill" onclick="sendRcon('admin Pozdrowienia z Konsoli Admina!')">📢 Wiadomość [Admin]</button>
+        <button class="preset-pill" onclick="sendRcon('time set day')">☀️ Ustaw Dzień</button>
+        <button class="preset-pill" onclick="sendRcon('weather clear')">🌤️ Czysta Pogoda</button>
+        <button class="preset-pill" onclick="sendRcon('save-all')">💾 Zapisz Świat</button>
+        <button class="preset-pill" onclick="sendRcon('list')">👥 Lista Graczy</button>
+      </div>
+    </section>
+
+    <!-- TAB NAVIGATION -->
+    <nav class="cyber-tabs">
+      <button class="tab-btn active" data-tab="tab-chat">
+        <span class="tab-num">01</span> 💬 CZAT Z GRACZAMI <span class="chat-unread-badge" id="chatUnreadBadge"></span>
+      </button>
+      <button class="tab-btn" data-tab="tab-console">
+        <span class="tab-num">02</span> KONSOLA ADMIN & LOGI
+      </button>
+      <button class="tab-btn" data-tab="tab-files">
+        <span class="tab-num">03</span> EKSPLORATOR PLIKÓW
+      </button>
+      <button class="tab-btn" data-tab="tab-mods">
+        <span class="tab-num">04</span> ARSENAŁ MODÓW
+      </button>
+      <button class="tab-btn" data-tab="tab-telemetry">
+        <span class="tab-num">05</span> PEŁNA TELEMETRIA
+      </button>
+    </nav>
+
+    <!-- TAB PANELS -->
+    <main class="tabs-content">
+      <!-- TAB 1: LIVE PLAYER CHAT -->
+      <section id="tab-chat" class="tab-panel active">
+        <div class="chat-workspace">
+          <!-- MAIN CHAT COLUMN -->
+          <div class="chat-main-column">
+            <div class="chat-header-bar">
+              <div class="chat-header-left">
+                <span class="chat-live-dot"></span>
+                <span class="chat-title">KANAŁ KOMUNIKACJI Z GRACZAMI // LIVE MINECRAFT CHAT</span>
+              </div>
+              <div class="chat-header-right">
+                <button class="cyber-btn-mini" onclick="clearChatView()">CZYŚĆ EKRAN</button>
+                <button id="btnChatSound" class="cyber-btn-mini active" onclick="toggleChatSound()">DŹWIĘK CZATU [ON]</button>
+              </div>
+            </div>
+
+            <!-- CHAT MESSAGES STREAM -->
+            <div class="chat-stream" id="chatStream">
+              <div class="chat-system-event">Łączenie ze strumieniem czatu graczy...</div>
+            </div>
+
+            <!-- CHAT COMPOSER -->
+            <form id="chatComposerForm" class="chat-composer" onsubmit="handleChatSubmit(event)">
+              <!-- Mode Selection Bar -->
+              <div class="chat-modes-bar">
+                <label class="mode-chip active" data-mode="chat">
+                  <input type="radio" name="chatMode" value="chat" checked>
+                  <span>💬 Czat standardowy [Admin]</span>
+                </label>
+                <label class="mode-chip" data-mode="title">
+                  <input type="radio" name="chatMode" value="title">
+                  <span>📢 Tytuł na środku (Title)</span>
+                </label>
+                <label class="mode-chip" data-mode="actionbar">
+                  <input type="radio" name="chatMode" value="actionbar">
+                  <span>⚡ Pasek nad ekwipunkiem</span>
+                </label>
+                <label class="mode-chip" data-mode="whisper">
+                  <input type="radio" name="chatMode" value="whisper">
+                  <span>🤫 Prywatna wiadomość (PW)</span>
+                </label>
+
+                <!-- Target Dropdown -->
+                <div class="chat-target-wrapper">
+                  <span class="target-lbl">DO:</span>
+                  <select id="chatTargetSelect" class="cyber-select-mini">
+                    <option value="@a">Wszyscy gracze (@a)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Input text and Send button -->
+              <div class="chat-input-row">
+                <input type="text" id="chatTextInput" class="chat-text-input" placeholder="Napisz wiadomość do graczy i wciśnij Enter..." autocomplete="off">
+                <button type="submit" class="cyber-btn btn-start chat-send-btn">
+                  <span>WYŚLIJ</span>
+                  <span class="send-icon">➤</span>
+                </button>
+              </div>
+
+              <!-- Quick Chat Suggestions -->
+              <div class="chat-quick-replies">
+                <span class="quick-lbl">SZYBKA ODPOWIEDŹ:</span>
+                <button type="button" class="quick-chip" onclick="quickSendChat('Siemanko wszystkim! Jak leci gra?')">👋 Siemanko!</button>
+                <button type="button" class="quick-chip" onclick="quickSendChat('Szykujcie się, szalona krowa nadchodzi!')">🐮 Szalona Krowa!</button>
+                <button type="button" class="quick-chip" onclick="quickSendChat('Za 5 minut restart serwera!')">⏳ Restart za 5 min</button>
+                <button type="button" class="quick-chip" onclick="quickSendChat('Wszystko pod kontrolą, miłej gry!')">👍 Miłej gry!</button>
+                <button type="button" class="quick-chip" onclick="quickSendChat('Daję wam dzień!')">☀️ Dzień!</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- SIDEBAR: ONLINE PLAYERS WITH QUICK ACTIONS -->
+          <div class="chat-sidebar">
+            <div class="sidebar-header-row">
+              <span class="sidebar-title">GRACZE NA SERWERZE</span>
+              <span class="player-count-badge" id="chatPlayerCount">0 / 8</span>
+            </div>
+
+            <div class="chat-players-list" id="chatPlayersList">
+              <div class="empty-players-msg">Brak graczy online</div>
+            </div>
+
+            <div class="admin-perks-box">
+              <div class="perks-title">SZYBKIE AKCJE ADMINA</div>
+              <div class="perks-grid">
+                <button type="button" class="perk-btn" onclick="sendRcon('time set day')">☀️ Ustaw Dzień</button>
+                <button type="button" class="perk-btn" onclick="sendRcon('weather clear')">🌤️ Czyste Niebo</button>
+                <button type="button" class="perk-btn" onclick="sendRcon('difficulty peaceful')">🕊️ Pokojowy</button>
+                <button type="button" class="perk-btn" onclick="sendRcon('difficulty hard')">💀 Poziom Hard</button>
+                <button type="button" class="perk-btn" onclick="sendRcon('give @a diamond 2')">💎 Diamenty (@a)</button>
+                <button type="button" class="perk-btn" onclick="sendRcon('save-all')">💾 Zapisz Świat</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: CONSOLE & LOGS -->
+      <section id="tab-console" class="tab-panel">
+        <div class="console-wrapper">
+          <div class="console-toolbar">
+            <div class="toolbar-left">
+              <span class="terminal-dot red"></span>
+              <span class="terminal-dot yellow"></span>
+              <span class="terminal-dot green"></span>
+              <span class="toolbar-title">TERMINAL // /opt/minecraft/logs/latest.log</span>
+            </div>
+            <div class="toolbar-right">
+              <input type="text" id="logFilter" class="cyber-input-mini" placeholder="Filtruj logi (np. crazycow, ERROR)...">
+              <button id="btnAutoScroll" class="cyber-btn-mini active" onclick="toggleAutoScroll()">AUTO-SCROLL [ON]</button>
+              <button class="cyber-btn-mini" onclick="clearConsoleView()">CZYŚĆ WIDOK</button>
+            </div>
+          </div>
+
+          <div class="console-body" id="consoleBody">
+            <div class="log-line info">[INICJALIZACJA] Łączenie ze strumieniem logów serwera...</div>
+          </div>
+
+          <!-- RCON Input Bar -->
+          <form id="rconForm" class="rcon-bar" onsubmit="handleRconSubmit(event)">
+            <span class="rcon-prompt">admin@grzybkowo#</span>
+            <input type="text" id="rconInput" class="rcon-input" placeholder="Napisz wiadomość jako [Admin] (np. Hejka!) lub wpisz komendę (np. list, time set day)..." autocomplete="off">
+            <button type="submit" class="cyber-btn-submit">WYŚLIJ [ENTER]</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 2: FILE EXPLORER -->
+      <section id="tab-files" class="tab-panel">
+        <div class="files-wrapper">
+          <div class="files-sidebar">
+            <div class="sidebar-header">KATALOGI SYSTEMOWE</div>
+            <ul class="quick-dirs-list">
+              <li onclick="browsePath('.')"><span class="icon">📁</span> /opt/minecraft (Główny)</li>
+              <li onclick="browsePath('mods')"><span class="icon">📦</span> mods/</li>
+              <li onclick="browsePath('logs')"><span class="icon">📜</span> logs/</li>
+              <li onclick="browsePath('config')"><span class="icon">⚙️</span> config/</li>
+              <li onclick="browsePath('automodpack')"><span class="icon">🔄</span> automodpack/</li>
+              <li onclick="browsePath('world')"><span class="icon">🌍</span> world/</li>
+              <li onclick="browsePath('backups')"><span class="icon">💾</span> backups/</li>
+            </ul>
+
+            <div class="sidebar-header" style="margin-top: 20px;">SZYBKI PODGLĄD KONFIGURACJI</div>
+            <ul class="quick-dirs-list">
+              <li onclick="viewFileContent('server.properties')"><span class="icon">📄</span> server.properties</li>
+              <li onclick="viewFileContent('eula.txt')"><span class="icon">📄</span> eula.txt</li>
+              <li onclick="viewFileContent('ops.json')"><span class="icon">📄</span> ops.json</li>
+              <li onclick="viewFileContent('whitelist.json')"><span class="icon">📄</span> whitelist.json</li>
+              <li onclick="viewFileContent('automodpack/automodpack-server.json')"><span class="icon">📄</span> automodpack-server.json</li>
+            </ul>
+          </div>
+
+          <div class="files-main">
+            <div class="files-breadcrumbs" id="filesBreadcrumbs">
+              <span class="crumb-root" onclick="browsePath('.')">/opt/minecraft</span>
+            </div>
+
+            <div class="files-table-container">
+              <table class="cyber-table">
+                <thead>
+                  <tr>
+                    <th>NAZWA</th>
+                    <th>ROZMIAR</th>
+                    <th>ZMODYFIKOWANO</th>
+                    <th>AKCJE</th>
+                  </tr>
+                </thead>
+                <tbody id="filesTableBody">
+                  <tr>
+                    <td colspan="4" class="text-center">Ładowanie zawartości katalogu...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: MODS ARSENAL -->
+      <section id="tab-mods" class="tab-panel">
+        <div class="mods-container">
+          <div class="mods-header">
+            <div>
+              <h2>ZAINSTALOWANE MODY (FORGE 1.20.1)</h2>
+              <p class="section-desc">Katalog: <code>/opt/minecraft/mods</code>. Kliknij przełącznik, aby dezaktywować mod (zmiana na .disabled).</p>
+            </div>
+            <button class="cyber-btn-mini" onclick="loadModsList()">ODŚWIEŻ MODY</button>
+          </div>
+
+          <div class="mods-grid" id="modsGrid">
+            <!-- Mod cards dynamically injected -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: TELEMETRY -->
+      <section id="tab-telemetry" class="tab-panel">
+        <div class="telemetry-wrapper">
+          <div class="telemetry-card">
+            <h3>CZUJNIKI TEMPERATURY (LMSENSORS)</h3>
+            <div id="sensorsJsonView" class="code-block">Pobieranie danych lm-sensors...</div>
+          </div>
+          <div class="telemetry-card">
+            <h3>PAMIĘĆ RAM I SWAP (/proc/meminfo)</h3>
+            <div id="memDetailsView" class="code-block">Pobieranie /proc/meminfo...</div>
+          </div>
+          <div class="telemetry-card">
+            <h3>KONTROLA DYSKU I PARTYCJI</h3>
+            <div id="diskDetailsView" class="code-block">Pobieranie statystyk dyskowych...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="cyber-footer">
+      <div>GRZYBKOWO CYBER-OPS // HOST: 192.168.1.15 // MINECRAFT FORGE 1.20.1-47.4.22 // CRAZY COW V2.3.0</div>
+      <div id="connectionLatency">PING: -- ms</div>
+    </footer>
+  </div>
+
+  <!-- FILE VIEWER MODAL -->
+  <div class="cyber-modal" id="fileModal">
+    <div class="modal-backdrop" onclick="closeFileModal()"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="file-icon">📄</span>
+          <span id="modalFileName">server.properties</span>
+        </div>
+        <div class="modal-actions">
+          <button class="cyber-btn-mini" onclick="copyModalContent()">SKOPIUJ TREŚĆ</button>
+          <button class="cyber-btn-mini btn-close" onclick="closeFileModal()">✕ ZAMKNIJ</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <pre class="file-content" id="modalFileContent"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRMATION MODAL -->
+  <div class="cyber-modal" id="confirmModal">
+    <div class="modal-backdrop" onclick="closeConfirmModal()"></div>
+    <div class="modal-box modal-sm">
+      <div class="modal-header">
+        <div class="modal-title" id="confirmTitle">POTWIERDZENIE AKCJI</div>
+        <button class="cyber-btn-mini btn-close" onclick="closeConfirmModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage" class="confirm-text">Czy na pewno chcesz wykonać tę operację?</p>
+        <div class="confirm-actions">
+          <button class="cyber-btn btn-kill" id="confirmBtnExecute">POTWIERDŹ [EXECUTE]</button>
+          <button class="cyber-btn btn-stop" onclick="closeConfirmModal()">ANULUJ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST -->
+  <div class="cyber-toast" id="cyberToast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
