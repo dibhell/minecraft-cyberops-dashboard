@@ -433,13 +433,15 @@
           <div class="tactical-map-panel">
             <div class="tactical-toolbar">
               <span id="mapStatus">POBIERANIE POZYCJI GRACZY...</span>
+              <span id="mapCursor">X: — // Y: — // Z: —</span>
               <button class="cyber-btn-mini" type="button" onclick="centerTacticalMap()">CENTRUJ GRACZY</button>
+              <button class="cyber-btn-mini" type="button" onclick="fitTacticalMap()">POKAŻ WSZYSTKO</button>
               <button class="cyber-btn-mini" type="button" onclick="pollTerrain(true)">ODŚWIEŻ TEREN</button>
               <button class="cyber-btn-mini" type="button" onclick="zoomTacticalMap(0.5)">+</button>
               <button class="cyber-btn-mini" type="button" onclick="zoomTacticalMap(2)">−</button>
             </div>
             <canvas id="tacticalMap" width="900" height="520" aria-label="Mapa współrzędnych graczy"></canvas>
-            <p class="section-desc">Kliknij mapę, aby ustawić X/Z. 🟢 gracz, 🔴 mob zrespiony przez panel. Wysokość terenu ustala serwer.</p>
+            <p class="section-desc">Przeciągnij mapę, użyj kółka do zoomu albo kliknij, aby ustawić X/Z. 🟢 gracz, 🔴 śledzony mob, żółty krzyż: punkt zrzutu.</p>
           </div>
 
           <form class="spawn-panel" onsubmit="spawnMob(event)">
@@ -470,6 +472,7 @@
               <input id="spawnCount" class="cyber-input-mini" type="number" min="1" max="10" value="1" required>
             </label>
             <div id="tacticalPlayers" class="tactical-players"></div>
+            <div id="tacticalMobsList" class="tactical-players"></div>
             <button class="cyber-btn btn-kill" type="submit">RESP MOBY</button>
           </form>
         </div>

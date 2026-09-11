@@ -101,6 +101,16 @@ def parse_entity_positions(response):
     ]
 
 
+def parse_named_entity_positions(response):
+    pattern = re.compile(
+        r"(?m)^(.+?) has the following entity data: \[\s*(-?\d+(?:\.\d+)?)[dDfF]?,\s*(-?\d+(?:\.\d+)?)[dDfF]?,\s*(-?\d+(?:\.\d+)?)[dDfF]?\s*\]"
+    )
+    return [
+        {"name": match.group(1).strip(), "x": round(float(match.group(2)), 1), "y": round(float(match.group(3)), 1), "z": round(float(match.group(4)), 1)}
+        for match in pattern.finditer(response)
+    ]
+
+
 def build_summon_command(entity_id, dimension, x, z, y=None):
     if y is None:
         return f'execute in {dimension} positioned {x} 0 {z} positioned over motion_blocking_no_leaves run summon {entity_id} ~ ~1 ~ {{Tags:["cyberops_tracked"]}}'
@@ -131,10 +141,10 @@ def tactical_mobs(dimension):
         f"execute in {dimension} as @e[tag=cyberops_tracked] run data get entity @s Pos",
         timeout=2.0,
     )
-    return [
-        {"id": index, "x": position[0], "y": position[1], "z": position[2], "dimension": dimension}
-        for index, position in enumerate(parse_entity_positions(response), 1)
-    ]
+    mobs = parse_named_entity_positions(response)
+    for index, mob in enumerate(mobs, 1):
+        mob.update({"id": index, "dimension": dimension})
+    return mobs
 
 # Cache for telemetry to ensure lightning-fast responses
 telemetry_lock = threading.Lock()
@@ -667,7 +677,7 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             try:
                 center_x = int(query.get("x", [0])[0])
                 center_z = int(query.get("z", [0])[0])
-                span = max(64, min(512, int(query.get("span", [512])[0])))
+                span = max(64, min(32768, int(query.get("span", [512])[0])))
             except ValueError:
                 self.send_error_json("Invalid terrain coordinates")
                 return

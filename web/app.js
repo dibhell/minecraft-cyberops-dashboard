@@ -86,6 +86,9 @@ let tacticalPolling = false;
 let terrainLayer = null;
 let terrainKey = '';
 let terrainPolling = false;
+let terrainTimer = null;
+let mapDrag = null;
+let mapWasDragged = false;
 
 // Clock
 function updateClock() {
@@ -179,19 +182,37 @@ function centerTacticalMap(force = true) {
     tacticalCenter.z = players.reduce((sum, player) => sum + player.z, 0) / players.length;
   }
   drawTacticalMap();
-  if (force) pollTerrain();
+  if (force) scheduleTerrain();
 }
 
 function zoomTacticalMap(factor) {
-  tacticalRange = Math.max(64, Math.min(4096, tacticalRange * factor));
+  tacticalRange = Math.max(64, Math.min(60000000, tacticalRange * factor));
   drawTacticalMap();
-  pollTerrain();
+  scheduleTerrain();
+}
+
+function fitTacticalMap() {
+  const points = [...visibleTacticalPlayers(), ...tacticalMobs];
+  if (!points.length) return;
+  const canvas = document.getElementById('tacticalMap');
+  const xs = points.map(point => point.x), zs = points.map(point => point.z);
+  tacticalCenter = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
+  const width = Math.max(...xs) - Math.min(...xs);
+  const depth = (Math.max(...zs) - Math.min(...zs)) * canvas.width / canvas.height;
+  tacticalRange = Math.max(64, Math.min(60000000, Math.max(width, depth) * 1.25 + 64));
+  drawTacticalMap();
+  scheduleTerrain();
+}
+
+function scheduleTerrain() {
+  clearTimeout(terrainTimer);
+  terrainTimer = setTimeout(() => pollTerrain(), 250);
 }
 
 async function pollTerrain(force = false) {
   if (terrainPolling || !document.getElementById('tab-tactical')?.classList.contains('active')) return;
   const dimension = document.getElementById('spawnDimension')?.value || 'minecraft:overworld';
-  const span = Math.min(512, tacticalRange);
+  const span = Math.min(32768, Math.round(tacticalRange));
   const x = Math.round(tacticalCenter.x), z = Math.round(tacticalCenter.z);
   const key = `${dimension}:${x}:${z}:${span}`;
   if (!force && key === terrainKey) return;
@@ -278,39 +299,111 @@ function drawTacticalMap() {
   for (const mob of tacticalMobs) {
     const px = toX(mob.x), py = toY(mob.z);
     ctx.fillStyle = '#ff2a5f';
-    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffb3c5';
-    ctx.fillText(`MOB #${mob.id}  Y:${Math.round(mob.y)}`, px + 11, py + 4);
+    ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${mob.name || 'MOB'} #${mob.id}  Y:${Math.round(mob.y)}`, px + 18, py + 4);
   }
 
   const x = Number(document.getElementById('spawnX')?.value);
   const z = Number(document.getElementById('spawnZ')?.value);
   if (Number.isFinite(x) && Number.isFinite(z)) {
     const px = toX(x), py = toY(z);
-    ctx.strokeStyle = '#ff2a5f'; ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ffb800'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(px - 10, py); ctx.lineTo(px + 10, py); ctx.moveTo(px, py - 10); ctx.lineTo(px, py + 10); ctx.stroke();
     ctx.lineWidth = 1;
   }
-  const terrainStatus = terrainPolling ? 'TEREN: ŁADOWANIE' : (terrainLayer ? 'TEREN: OK' : 'TEREN: BRAK');
+  const terrainStatus = terrainPolling ? 'TEREN: ŁADOWANIE' : (terrainLayer ? (terrainLayer.span < tacticalRange ? 'TEREN: CZĘŚCIOWY' : 'TEREN: OK') : 'TEREN: BRAK');
   document.getElementById('mapStatus').textContent = `${visibleTacticalPlayers().length} GRACZY // ${tacticalMobs.length} MOBÓW // ${terrainStatus} // X:${Math.round(tacticalCenter.x)} Z:${Math.round(tacticalCenter.z)} // ZASIĘG ${tacticalRange}`;
 }
 
-document.getElementById('tacticalMap')?.addEventListener('click', event => {
+function tacticalPoint(event) {
   const canvas = event.currentTarget;
   const rect = canvas.getBoundingClientRect();
-  const px = (event.clientX - rect.left) * canvas.width / rect.width;
-  const py = (event.clientY - rect.top) * canvas.height / rect.height;
-  document.getElementById('spawnX').value = Math.round(tacticalCenter.x + (px - canvas.width / 2) * tacticalRange / canvas.width);
-  document.getElementById('spawnZ').value = Math.round(tacticalCenter.z + (py - canvas.height / 2) * tacticalRange / canvas.width);
+  return {
+    px: (event.clientX - rect.left) * canvas.width / rect.width,
+    py: (event.clientY - rect.top) * canvas.height / rect.height
+  };
+}
+
+function terrainHeightAt(x, z) {
+  if (!terrainLayer) return null;
+  const cell = terrainLayer.span / terrainLayer.size;
+  const column = Math.floor((x - (terrainLayer.center_x - terrainLayer.span / 2)) / cell);
+  const row = Math.floor((z - (terrainLayer.center_z - terrainLayer.span / 2)) / cell);
+  if (column < 0 || row < 0 || column >= terrainLayer.size || row >= terrainLayer.size) return null;
+  return terrainLayer.heights[row * terrainLayer.size + column];
+}
+
+const tacticalMap = document.getElementById('tacticalMap');
+tacticalMap?.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return;
+  const point = tacticalPoint(event);
+  mapDrag = { ...point, centerX: tacticalCenter.x, centerZ: tacticalCenter.z };
+  mapWasDragged = false;
+  tacticalMap.setPointerCapture(event.pointerId);
+  tacticalMap.classList.add('dragging');
+});
+
+tacticalMap?.addEventListener('pointermove', event => {
+  const point = tacticalPoint(event);
+  const scale = tacticalMap.width / tacticalRange;
+  const worldX = tacticalCenter.x + (point.px - tacticalMap.width / 2) / scale;
+  const worldZ = tacticalCenter.z + (point.py - tacticalMap.height / 2) / scale;
+  const height = terrainHeightAt(worldX, worldZ);
+  document.getElementById('mapCursor').textContent = `X: ${Math.round(worldX)} // Y: ${height ?? '—'} // Z: ${Math.round(worldZ)}`;
+  if (!mapDrag) return;
+  const dx = point.px - mapDrag.px, dy = point.py - mapDrag.py;
+  mapWasDragged ||= Math.abs(dx) + Math.abs(dy) > 4;
+  tacticalCenter = { x: mapDrag.centerX - dx / scale, z: mapDrag.centerZ - dy / scale };
+  drawTacticalMap();
+});
+
+tacticalMap?.addEventListener('pointerup', event => {
+  if (!mapDrag) return;
+  mapDrag = null;
+  tacticalMap.releasePointerCapture(event.pointerId);
+  tacticalMap.classList.remove('dragging');
+  if (mapWasDragged) scheduleTerrain();
+});
+
+tacticalMap?.addEventListener('wheel', event => {
+  event.preventDefault();
+  const point = tacticalPoint(event);
+  const oldScale = tacticalMap.width / tacticalRange;
+  const worldX = tacticalCenter.x + (point.px - tacticalMap.width / 2) / oldScale;
+  const worldZ = tacticalCenter.z + (point.py - tacticalMap.height / 2) / oldScale;
+  tacticalRange = Math.max(64, Math.min(60000000, tacticalRange * (event.deltaY > 0 ? 1.35 : 0.74)));
+  const newScale = tacticalMap.width / tacticalRange;
+  tacticalCenter = { x: worldX - (point.px - tacticalMap.width / 2) / newScale, z: worldZ - (point.py - tacticalMap.height / 2) / newScale };
+  drawTacticalMap();
+  scheduleTerrain();
+}, { passive: false });
+
+tacticalMap?.addEventListener('click', event => {
+  if (mapWasDragged) {
+    mapWasDragged = false;
+    return;
+  }
+  const { px, py } = tacticalPoint(event);
+  document.getElementById('spawnX').value = Math.round(tacticalCenter.x + (px - tacticalMap.width / 2) * tacticalRange / tacticalMap.width);
+  document.getElementById('spawnZ').value = Math.round(tacticalCenter.z + (py - tacticalMap.height / 2) * tacticalRange / tacticalMap.width);
   drawTacticalMap();
 });
 
 function renderTacticalPlayers() {
   const target = document.getElementById('tacticalPlayers');
   if (!target) return;
-  target.innerHTML = visibleTacticalPlayers().map(player =>
+  target.innerHTML = '<span class="section-desc">GRACZE</span>' + (visibleTacticalPlayers().map(player =>
     `<button class="cyber-btn-mini tactical-player" type="button" onclick="selectPlayerPosition('${escapeHtml(player.name)}')">● ${escapeHtml(player.name)} — X:${Math.round(player.x)} Y:${Math.round(player.y)} Z:${Math.round(player.z)}</button>`
-  ).join('') || '<span class="section-desc">Brak graczy w tym wymiarze.</span>';
+  ).join('') || '<span class="section-desc">Brak graczy w tym wymiarze.</span>');
+  const mobs = document.getElementById('tacticalMobsList');
+  if (mobs) {
+    mobs.innerHTML = '<span class="section-desc">ŚLEDZONE MOBY</span>' + (tacticalMobs.map(mob =>
+      `<button class="cyber-btn-mini tactical-player" type="button" onclick="selectMobPosition(${mob.id})">● ${escapeHtml(mob.name || 'MOB')} — X:${Math.round(mob.x)} Y:${Math.round(mob.y)} Z:${Math.round(mob.z)}</button>`
+    ).join('') || '<span class="section-desc">Brak śledzonych mobów.</span>');
+  }
 }
 
 function selectPlayerPosition(name) {
@@ -322,6 +415,16 @@ function selectPlayerPosition(name) {
   tacticalCenter = { x: player.x, z: player.z };
   renderTacticalPlayers();
   drawTacticalMap();
+}
+
+function selectMobPosition(id) {
+  const mob = tacticalMobs.find(item => item.id === id);
+  if (!mob) return;
+  tacticalCenter = { x: mob.x, z: mob.z };
+  document.getElementById('spawnX').value = Math.round(mob.x);
+  document.getElementById('spawnZ').value = Math.round(mob.z);
+  drawTacticalMap();
+  scheduleTerrain();
 }
 
 function spawnMob(event) {
@@ -346,7 +449,10 @@ async function executeMobSpawn(payload) {
     const data = await res.json();
     showToast(data.success ? `✔ Zrespiono ${payload.count} × ${payload.entity}` : `✖ ${data.error || data.responses?.[0] || 'Respawn nieudany'}`);
     playCyberSound(data.success ? 'success' : 'alert');
-    if (data.success) await pollTactical();
+    if (data.success) {
+      await pollTactical();
+      fitTacticalMap();
+    }
   } catch (err) {
     showToast(`✖ Błąd sieci: ${err.message}`);
   }

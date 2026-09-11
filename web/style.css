@@ -923,7 +923,8 @@ body.crt-scanlines::after {
   font-size: 0.76rem;
 }
 
-.tactical-toolbar span { margin-right: auto; }
+.tactical-toolbar #mapStatus { margin-right: auto; }
+#mapCursor { color: var(--neon-amber); white-space: nowrap; }
 
 #tacticalMap {
   display: block;
@@ -932,7 +933,10 @@ body.crt-scanlines::after {
   background: #020507;
   border: 1px solid rgba(0, 240, 255, 0.35);
   cursor: crosshair;
+  touch-action: none;
 }
+
+#tacticalMap.dragging { cursor: grabbing; }
 
 .spawn-panel, .spawn-panel label {
   display: flex;

@@ -31,6 +31,10 @@ class ModUploadValidationTest(unittest.TestCase):
         self.assertEqual(server.parse_entity_position("Player has data: [12.5d, 64.0d, -7.25d]"), [12.5, 64.0, -7.2])
         self.assertEqual(server.parse_entity_positions("a [1.0d, 2.0d, 3.0d]\nb [-4.0d, 5.0d, 6.0d]"), [[1.0, 2.0, 3.0], [-4.0, 5.0, 6.0]])
         self.assertEqual(
+            server.parse_named_entity_positions("Crazy Cow V2 has the following entity data: [-625.5d, 98.0d, -718.5d]"),
+            [{"name": "Crazy Cow V2", "x": -625.5, "y": 98.0, "z": -718.5}],
+        )
+        self.assertEqual(
             server.build_summon_command("crazycow:szalona_krowa_v2", "minecraft:overworld", 12, -7),
             'execute in minecraft:overworld positioned 12 0 -7 positioned over motion_blocking_no_leaves run summon crazycow:szalona_krowa_v2 ~ ~1 ~ {Tags:["cyberops_tracked"]}',
         )
