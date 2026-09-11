@@ -5,6 +5,8 @@ Ultra-lightweight, zero-dependency Python 3 standard library server.
 Runs on 192.168.1.15 (Ubuntu host 'Grzybkowo') on port 8080.
 """
 
+import base64
+import hmac
 import http.server
 import json
 import os
@@ -15,7 +17,9 @@ import struct
 import subprocess
 import sys
 import threading
+import tempfile
 import time
+import zipfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -23,7 +27,9 @@ CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 DEFAULT_CONFIG = {
     "mc_dir": "/opt/minecraft",
     "sudo_pass": "",
-    "port": 8080
+    "port": 8080,
+    "auth_user": "admin",
+    "auth_password": ""
 }
 
 _cfg = dict(DEFAULT_CONFIG)
@@ -37,7 +43,39 @@ if CONFIG_PATH.exists():
 MC_DIR = Path(os.environ.get("MC_DIR", _cfg["mc_dir"]))
 SUDO_PASS = os.environ.get("SUDO_PASS", _cfg["sudo_pass"])
 PORT = int(os.environ.get("PORT", _cfg["port"]))
+AUTH_USER = os.environ.get("DASHBOARD_USER", _cfg["auth_user"])
+AUTH_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", _cfg["auth_password"])
 WEB_DIR = Path(__file__).resolve().parent / "web"
+MAX_MOD_BYTES = 256 * 1024 * 1024
+MOD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+() -]{0,179}\.jar$", re.IGNORECASE)
+upload_lock = threading.Lock()
+
+
+def valid_mod_name(name):
+    return bool(MOD_NAME_RE.fullmatch(name)) and Path(name).name == name
+
+
+def valid_mod_jar(path):
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = set(archive.namelist())
+        return bool(names & {"META-INF/mods.toml", "fabric.mod.json", "quilt.mod.json"})
+    except (OSError, zipfile.BadZipFile):
+        return False
+
+
+def valid_basic_auth(header, expected_user, expected_password):
+    try:
+        scheme, token = header.split(" ", 1)
+        supplied = base64.b64decode(token, validate=True).decode("utf-8")
+        user, password = supplied.split(":", 1)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return (
+        scheme.lower() == "basic"
+        and hmac.compare_digest(user, expected_user)
+        and hmac.compare_digest(password, expected_password)
+    )
 
 # Cache for telemetry to ensure lightning-fast responses
 telemetry_lock = threading.Lock()
@@ -404,12 +442,20 @@ def telemetry_poller():
         time.sleep(1.5)
 
 class CyberHandler(http.server.BaseHTTPRequestHandler):
+    def is_authorized(self):
+        if valid_basic_auth(self.headers.get("Authorization", ""), AUTH_USER, AUTH_PASSWORD):
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="Minecraft Cyber-Ops", charset="UTF-8"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(body)
@@ -418,13 +464,14 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
         self.send_json({"error": msg, "success": False}, status=status)
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        if not self.is_authorized():
+            return
+        self.send_response(204)
         self.end_headers()
 
     def do_GET(self):
+        if not self.is_authorized():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
@@ -575,8 +622,14 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             self.send_error_json(str(e), 500)
 
     def do_POST(self):
+        if not self.is_authorized():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/mod/upload":
+            self.upload_mod(parse_qs(parsed.query))
+            return
         
         # Read JSON body
         content_length = int(self.headers.get("Content-Length", 0))
@@ -741,7 +794,53 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
 
         self.send_error_json("Endpoint not found", 404)
 
+    def upload_mod(self, query):
+        name = query.get("filename", [""])[0]
+        if not valid_mod_name(name):
+            self.send_error_json("Invalid filename; select a .jar file", 400)
+            return
+        try:
+            size = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            size = 0
+        if not 0 < size <= MAX_MOD_BYTES:
+            self.send_error_json("File must be between 1 byte and 256 MB", 413)
+            return
+
+        mods_dir = MC_DIR / "mods"
+        mods_dir.mkdir(parents=True, exist_ok=True)
+        destination = mods_dir / name
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=mods_dir, suffix=".uploading", delete=False) as output:
+                temporary = Path(output.name)
+                remaining = size
+                while remaining:
+                    chunk = self.rfile.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("Upload ended before the declared size")
+                    output.write(chunk)
+                    remaining -= len(chunk)
+
+            if not valid_mod_jar(temporary):
+                self.send_error_json("The file is not a recognized Forge/Fabric/Quilt mod", 400)
+                return
+            with upload_lock:
+                if destination.exists():
+                    self.send_error_json("A mod with this filename already exists", 409)
+                    return
+                os.replace(temporary, destination)
+                temporary = None
+            self.send_json({"success": True, "name": name, "size": size, "restart_required": True}, 201)
+        except (OSError, ValueError) as e:
+            self.send_error_json(f"Upload failed: {e}", 500)
+        finally:
+            if temporary:
+                temporary.unlink(missing_ok=True)
+
 def run():
+    if not AUTH_USER or not AUTH_PASSWORD:
+        raise SystemExit("Set auth_user/auth_password in config.json or DASHBOARD_USER/DASHBOARD_PASSWORD")
     # Start background telemetry poller
     t = threading.Thread(target=telemetry_poller, daemon=True)
     t.start()

@@ -877,6 +877,18 @@ body.crt-scanlines::after {
   letter-spacing: 1px;
 }
 
+.mod-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mod-upload progress {
+  width: 180px;
+  accent-color: var(--neon-green);
+}
+
 .section-desc {
   font-size: 0.78rem;
   color: var(--text-dim);

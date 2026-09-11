@@ -36,7 +36,9 @@ Działa bezpośrednio na maszynie serwera (Linux Ubuntu/Debian) i umożliwia pe�
   - Podgląd plików konfiguracyjnych (`server.properties`, `ops.json`, `eula.txt`) w oknie modalnym z kopiowaniem do schowka.
 * 📦 **Arsenał Modów:**
   - Lista zainstalowanych modów Forge.
+  - Wgrywanie plików `.jar` z przeglądarki z kontrolą nazwy, rozmiaru i struktury moda.
   - Szybkie wyłączanie/włączanie modów (`.jar` ↔ `.jar.disabled`) bez ich usuwania.
+* 🔒 **Dostęp chroniony:** cały panel i API wymagają loginu i hasła HTTP Basic.
 * 🎨 **Aestetyka Cyberpunk / Sci-Fi Terminal:**
   - Przełącznik CRT Scanlines (efekt monitora kineskopowego).
   - Wbudowany syntezator dźwięków kliknięć i potwierdzeń (Web Audio API, bez zewnętrznych plików audio!).
@@ -72,7 +74,9 @@ Dostosuj plik `config.json`:
 {
   "mc_dir": "/opt/minecraft",
   "sudo_pass": "TWOJE_HASLO_SUDO",
-  "port": 8080
+  "port": 8080,
+  "auth_user": "admin",
+  "auth_password": "DLUGIE_LOSOWE_HASLO"
 }
 ```
 

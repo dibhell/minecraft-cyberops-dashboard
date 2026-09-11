@@ -412,6 +412,13 @@
             <button class="cyber-btn-mini" onclick="loadModsList()">ODŚWIEŻ MODY</button>
           </div>
 
+          <form class="mod-upload" onsubmit="uploadMod(event)">
+            <input id="modUploadFile" class="cyber-input-mini" type="file" accept=".jar,application/java-archive" required>
+            <button class="cyber-btn btn-start" type="submit">WGRAJ MOD .JAR</button>
+            <progress id="modUploadProgress" value="0" max="100" hidden></progress>
+            <span id="modUploadStatus" class="section-desc">Plik zostanie sprawdzony i zapisany w katalogu mods/. Restart wykonujesz ręcznie.</span>
+          </form>
+
           <div class="mods-grid" id="modsGrid">
             <!-- Mod cards dynamically injected -->
           </div>

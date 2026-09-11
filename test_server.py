@@ -1,0 +1,31 @@
+import base64
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+
+import server
+
+
+class ModUploadValidationTest(unittest.TestCase):
+    def test_names_and_jar_signature(self):
+        self.assertTrue(server.valid_mod_name("crazy-cow-v2.jar"))
+        self.assertFalse(server.valid_mod_name("../evil.jar"))
+        self.assertFalse(server.valid_mod_name("not-a-mod.zip"))
+        with tempfile.TemporaryDirectory() as directory:
+            jar = Path(directory) / "mod.jar"
+            with zipfile.ZipFile(jar, "w") as archive:
+                archive.writestr("META-INF/mods.toml", "modLoader='javafml'")
+            self.assertTrue(server.valid_mod_jar(jar))
+            jar.write_bytes(b"not a jar")
+            self.assertFalse(server.valid_mod_jar(jar))
+
+    def test_basic_auth(self):
+        token = base64.b64encode(b"admin:secret").decode("ascii")
+        self.assertTrue(server.valid_basic_auth(f"Basic {token}", "admin", "secret"))
+        self.assertFalse(server.valid_basic_auth(f"Basic {token}", "admin", "wrong"))
+        self.assertFalse(server.valid_basic_auth("garbage", "admin", "secret"))
+
+
+if __name__ == "__main__":
+    unittest.main()

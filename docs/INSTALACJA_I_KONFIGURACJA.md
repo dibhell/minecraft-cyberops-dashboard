@@ -51,7 +51,9 @@ Zawartość `config.json`:
 {
   "mc_dir": "/opt/minecraft",
   "sudo_pass": "TWOJE_HASLO_SUDO",
-  "port": 8080
+  "port": 8080,
+  "auth_user": "admin",
+  "auth_password": "DLUGIE_LOSOWE_HASLO"
 }
 ```
 
@@ -60,6 +62,8 @@ Parametry można również przekazać przez zmienne systemowe:
 * `MC_DIR`: Ścieżka do folderu Minecrafta (domyślnie `/opt/minecraft`).
 * `SUDO_PASS`: Hasło użytkownika do wywoływania `sudo systemctl ...`.
 * `PORT`: Port HTTP dashboardu (domyślnie `8080`).
+* `DASHBOARD_USER`: Login do panelu (domyślnie `admin`).
+* `DASHBOARD_PASSWORD`: Hasło do panelu; bez niego usługa nie wystartuje.
 
 ---
 

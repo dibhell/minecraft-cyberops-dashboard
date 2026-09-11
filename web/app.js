@@ -592,6 +592,47 @@ function copyModalContent() {
 }
 
 // Mods Arsenal
+function uploadMod(event) {
+  event.preventDefault();
+  const input = document.getElementById('modUploadFile');
+  const progress = document.getElementById('modUploadProgress');
+  const status = document.getElementById('modUploadStatus');
+  const file = input.files[0];
+  if (!file || !file.name.toLowerCase().endsWith('.jar')) {
+    showToast('Wybierz plik .jar');
+    return;
+  }
+
+  const request = new XMLHttpRequest();
+  request.open('POST', `/api/mod/upload?filename=${encodeURIComponent(file.name)}`);
+  request.setRequestHeader('Content-Type', 'application/java-archive');
+  progress.hidden = false;
+  progress.value = 0;
+  status.textContent = `Wysyłanie ${file.name}...`;
+  request.upload.onprogress = e => {
+    if (e.lengthComputable) progress.value = Math.round(e.loaded * 100 / e.total);
+  };
+  request.onload = () => {
+    let data = {};
+    try { data = JSON.parse(request.responseText); } catch (_) {}
+    if (request.status === 201) {
+      status.textContent = `${file.name} wgrany. Uruchom ponownie serwer, aby go załadować.`;
+      showToast('Mod wgrany poprawnie — wymagany restart');
+      input.value = '';
+      loadModsList();
+    } else {
+      status.textContent = `Błąd: ${data.error || request.statusText}`;
+      showToast(status.textContent);
+    }
+  };
+  request.onerror = () => {
+    status.textContent = 'Błąd połączenia podczas wysyłania pliku.';
+    showToast(status.textContent);
+  };
+  request.onloadend = () => { progress.hidden = true; };
+  request.send(file);
+}
+
 async function loadModsList() {
   playCyberSound('click');
   const grid = document.getElementById('modsGrid');
@@ -957,4 +998,3 @@ document.addEventListener('DOMContentLoaded', () => {
   // Loop for log streaming (2.5s)
   setInterval(pollLogs, 2500);
 });
-
