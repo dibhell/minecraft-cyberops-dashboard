@@ -39,7 +39,7 @@ Działa bezpośrednio na maszynie serwera (Linux Ubuntu/Debian) i umożliwia pe�
   - Wgrywanie plików `.jar` z przeglądarki z kontrolą nazwy, rozmiaru i struktury moda.
   - Szybkie wyłączanie/włączanie modów (`.jar` ↔ `.jar.disabled`) bez ich usuwania.
 * 🔒 **Dostęp chroniony:** cały panel i API wymagają loginu i hasła HTTP Basic.
-* 🗺️ **Mapa taktyczna:** pozycje graczy na siatce X/Z oraz kontrolowany respawn mobów vanilla i modowanych z automatycznym doborem wysokości terenu.
+* 🗺️ **Mapa taktyczna:** schematyczny rzut terenu z wodą, roślinnością i wysokością, pozycje graczy oraz kontrolowany respawn i tracking mobów.
 * 🎨 **Aestetyka Cyberpunk / Sci-Fi Terminal:**
   - Przełącznik CRT Scanlines (efekt monitora kineskopowego).
   - Wbudowany syntezator dźwięków kliknięć i potwierdzeń (Web Audio API, bez zewnętrznych plików audio!).

@@ -23,6 +23,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from terrain import terrain_grid
+
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 DEFAULT_CONFIG = {
     "mc_dir": "/opt/minecraft",
@@ -51,6 +53,7 @@ MOD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+() -]{0,179}\.jar$", re.IGNO
 RESOURCE_ID_RE = re.compile(r"^[a-z0-9_.-]+:[a-z0-9_./-]+$")
 PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{1,16}$")
 upload_lock = threading.Lock()
+terrain_lock = threading.Lock()
 
 
 def valid_mod_name(name):
@@ -657,6 +660,24 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             with telemetry_lock:
                 names = list(telemetry_data.get("minecraft", {}).get("players", {}).get("list", []))
             self.send_json({"players": tactical_players(names), "mobs": tactical_mobs(dimension)})
+            return
+
+        elif path == "/api/terrain":
+            dimension = query.get("dimension", ["minecraft:overworld"])[0].lower()
+            try:
+                center_x = int(query.get("x", [0])[0])
+                center_z = int(query.get("z", [0])[0])
+                span = max(64, min(512, int(query.get("span", [512])[0])))
+            except ValueError:
+                self.send_error_json("Invalid terrain coordinates")
+                return
+            if not RESOURCE_ID_RE.fullmatch(dimension) or abs(center_x) > 30000000 or abs(center_z) > 30000000:
+                self.send_error_json("Invalid terrain location")
+                return
+            world_dir = MC_DIR / parse_server_properties().get("level-name", "world")
+            with terrain_lock:
+                terrain = terrain_grid(world_dir, dimension, center_x, center_z, span)
+            self.send_json(terrain)
             return
 
         # Serve static web frontend

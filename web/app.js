@@ -83,6 +83,9 @@ let tacticalMobs = [];
 let tacticalCenter = { x: 0, z: 0 };
 let tacticalRange = 512;
 let tacticalPolling = false;
+let terrainLayer = null;
+let terrainKey = '';
+let terrainPolling = false;
 
 // Clock
 function updateClock() {
@@ -156,6 +159,7 @@ async function pollTactical() {
     tacticalMobs = data.mobs || [];
     centerTacticalMap(false);
     renderTacticalPlayers();
+    pollTerrain();
   } catch (err) {
     document.getElementById('mapStatus').textContent = `BŁĄD MAPY: ${err.message}`;
   } finally {
@@ -175,11 +179,45 @@ function centerTacticalMap(force = true) {
     tacticalCenter.z = players.reduce((sum, player) => sum + player.z, 0) / players.length;
   }
   drawTacticalMap();
+  if (force) pollTerrain();
 }
 
 function zoomTacticalMap(factor) {
   tacticalRange = Math.max(64, Math.min(4096, tacticalRange * factor));
   drawTacticalMap();
+  pollTerrain();
+}
+
+async function pollTerrain(force = false) {
+  if (terrainPolling || !document.getElementById('tab-tactical')?.classList.contains('active')) return;
+  const dimension = document.getElementById('spawnDimension')?.value || 'minecraft:overworld';
+  const span = Math.min(512, tacticalRange);
+  const x = Math.round(tacticalCenter.x), z = Math.round(tacticalCenter.z);
+  const key = `${dimension}:${x}:${z}:${span}`;
+  if (!force && key === terrainKey) return;
+  if (key !== terrainKey) terrainLayer = null;
+  terrainPolling = true;
+  drawTacticalMap();
+  try {
+    const res = await fetch(`/api/terrain?dimension=${encodeURIComponent(dimension)}&x=${x}&z=${z}&span=${span}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    terrainLayer = await res.json();
+    terrainKey = key;
+  } catch (err) {
+    showToast(`Błąd renderowania terenu: ${err.message}`);
+  } finally {
+    terrainPolling = false;
+    drawTacticalMap();
+  }
+}
+
+function terrainColor(height, kind, shade) {
+  if (kind === 'w') return `hsl(205 70% ${Math.max(20, 38 + shade)}%)`;
+  if (kind === 'f') return `hsl(125 48% ${Math.max(17, 30 + shade)}%)`;
+  if (height < 64) return `hsl(48 42% ${Math.max(24, 42 + shade)}%)`;
+  if (height < 100) return `hsl(88 38% ${Math.max(20, 36 + shade)}%)`;
+  if (height < 150) return `hsl(34 28% ${Math.max(24, 40 + shade)}%)`;
+  return `hsl(0 0% ${Math.min(88, 58 + shade)}%)`;
 }
 
 function drawTacticalMap() {
@@ -191,6 +229,25 @@ function drawTacticalMap() {
   const toY = z => canvas.height / 2 + (z - tacticalCenter.z) * scale;
   ctx.fillStyle = '#020507';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (terrainLayer) {
+    const cell = terrainLayer.span / terrainLayer.size;
+    const cellPixels = cell * scale + 1;
+    for (let row = 0; row < terrainLayer.size; row++) {
+      for (let column = 0; column < terrainLayer.size; column++) {
+        const index = row * terrainLayer.size + column;
+        const height = terrainLayer.heights[index];
+        if (height === null) continue;
+        const left = terrainLayer.heights[index - (column > 0 ? 1 : 0)] ?? height;
+        const up = terrainLayer.heights[index - (row > 0 ? terrainLayer.size : 0)] ?? height;
+        const shade = Math.max(-12, Math.min(12, (height - left + height - up) * 2));
+        ctx.fillStyle = terrainColor(height, terrainLayer.kinds[index], shade);
+        const worldX = terrainLayer.center_x - terrainLayer.span / 2 + column * cell;
+        const worldZ = terrainLayer.center_z - terrainLayer.span / 2 + row * cell;
+        ctx.fillRect(toX(worldX), toY(worldZ), cellPixels, cellPixels);
+      }
+    }
+  }
 
   let step = 16;
   while (step * scale < 55) step *= 2;
@@ -234,7 +291,8 @@ function drawTacticalMap() {
     ctx.beginPath(); ctx.moveTo(px - 10, py); ctx.lineTo(px + 10, py); ctx.moveTo(px, py - 10); ctx.lineTo(px, py + 10); ctx.stroke();
     ctx.lineWidth = 1;
   }
-  document.getElementById('mapStatus').textContent = `${visibleTacticalPlayers().length} GRACZY // ${tacticalMobs.length} ŚLEDZONYCH MOBÓW // ŚRODEK X:${Math.round(tacticalCenter.x)} Z:${Math.round(tacticalCenter.z)} // ZASIĘG ${tacticalRange}`;
+  const terrainStatus = terrainPolling ? 'TEREN: ŁADOWANIE' : (terrainLayer ? 'TEREN: OK' : 'TEREN: BRAK');
+  document.getElementById('mapStatus').textContent = `${visibleTacticalPlayers().length} GRACZY // ${tacticalMobs.length} MOBÓW // ${terrainStatus} // X:${Math.round(tacticalCenter.x)} Z:${Math.round(tacticalCenter.z)} // ZASIĘG ${tacticalRange}`;
 }
 
 document.getElementById('tacticalMap')?.addEventListener('click', event => {

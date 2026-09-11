@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 import server
+import terrain
 
 
 class ModUploadValidationTest(unittest.TestCase):
@@ -33,6 +34,17 @@ class ModUploadValidationTest(unittest.TestCase):
             server.build_summon_command("crazycow:szalona_krowa_v2", "minecraft:overworld", 12, -7),
             'execute in minecraft:overworld positioned 12 0 -7 positioned over motion_blocking_no_leaves run summon crazycow:szalona_krowa_v2 ~ ~1 ~ {Tags:["cyberops_tracked"]}',
         )
+
+    def test_heightmap_unpacking(self):
+        values = list(range(256))
+        bits, per_long = 9, 64 // 9
+        packed = []
+        for start in range(0, len(values), per_long):
+            word = 0
+            for offset, value in enumerate(values[start:start + per_long]):
+                word |= value << (offset * bits)
+            packed.append(word)
+        self.assertEqual(terrain.unpack_height(packed, 173, -64), 109)
 
 
 if __name__ == "__main__":
