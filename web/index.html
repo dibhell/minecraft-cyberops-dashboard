@@ -215,8 +215,11 @@
       <button class="tab-btn" data-tab="tab-mods">
         <span class="tab-num">04</span> ARSENAŁ MODÓW
       </button>
+      <button class="tab-btn" data-tab="tab-tactical">
+        <span class="tab-num">05</span> MAPA TAKTYCZNA
+      </button>
       <button class="tab-btn" data-tab="tab-telemetry">
-        <span class="tab-num">05</span> PEŁNA TELEMETRIA
+        <span class="tab-num">06</span> PEŁNA TELEMETRIA
       </button>
     </nav>
 
@@ -422,6 +425,52 @@
           <div class="mods-grid" id="modsGrid">
             <!-- Mod cards dynamically injected -->
           </div>
+        </div>
+      </section>
+
+      <section id="tab-tactical" class="tab-panel">
+        <div class="tactical-layout">
+          <div class="tactical-map-panel">
+            <div class="tactical-toolbar">
+              <span id="mapStatus">POBIERANIE POZYCJI GRACZY...</span>
+              <button class="cyber-btn-mini" type="button" onclick="centerTacticalMap()">CENTRUJ GRACZY</button>
+              <button class="cyber-btn-mini" type="button" onclick="zoomTacticalMap(0.5)">+</button>
+              <button class="cyber-btn-mini" type="button" onclick="zoomTacticalMap(2)">−</button>
+            </div>
+            <canvas id="tacticalMap" width="900" height="520" aria-label="Mapa współrzędnych graczy"></canvas>
+            <p class="section-desc">Kliknij mapę, aby ustawić X/Z. Tło jest siatką współrzędnych; wysokość terenu ustala serwer przy respawnie.</p>
+          </div>
+
+          <form class="spawn-panel" onsubmit="spawnMob(event)">
+            <h3>ZRZUT MOBA</h3>
+            <label>ID MOBA
+              <input id="spawnEntity" class="cyber-input-mini" list="mobPresets" value="crazycow:szalona_krowa_v2" required>
+              <datalist id="mobPresets">
+                <option value="crazycow:szalona_krowa_v2">Szalona Krowa V2</option>
+                <option value="crazycow:szalona_krowa">Szalona Krowa</option>
+                <option value="minecraft:creeper">Creeper</option>
+                <option value="minecraft:zombie">Zombie</option>
+                <option value="minecraft:warden">Warden</option>
+              </datalist>
+            </label>
+            <label>WYMIAR
+              <select id="spawnDimension" class="cyber-select-mini" onchange="centerTacticalMap(); renderTacticalPlayers()">
+                <option value="minecraft:overworld">Overworld</option>
+                <option value="minecraft:the_nether">Nether</option>
+                <option value="minecraft:the_end">The End</option>
+              </select>
+            </label>
+            <div class="spawn-coordinates">
+              <label>X <input id="spawnX" class="cyber-input-mini" type="number" step="1" required></label>
+              <label>Z <input id="spawnZ" class="cyber-input-mini" type="number" step="1" required></label>
+              <label>Y <input id="spawnY" class="cyber-input-mini" type="number" step="1" placeholder="AUTO"></label>
+            </div>
+            <label>LICZBA (1–10)
+              <input id="spawnCount" class="cyber-input-mini" type="number" min="1" max="10" value="1" required>
+            </label>
+            <div id="tacticalPlayers" class="tactical-players"></div>
+            <button class="cyber-btn btn-kill" type="submit">RESP MOBY</button>
+          </form>
         </div>
       </section>
 

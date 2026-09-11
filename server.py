@@ -48,6 +48,8 @@ AUTH_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", _cfg["auth_password"])
 WEB_DIR = Path(__file__).resolve().parent / "web"
 MAX_MOD_BYTES = 256 * 1024 * 1024
 MOD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+() -]{0,179}\.jar$", re.IGNORECASE)
+RESOURCE_ID_RE = re.compile(r"^[a-z0-9_.-]+:[a-z0-9_./-]+$")
+PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{1,16}$")
 upload_lock = threading.Lock()
 
 
@@ -76,6 +78,39 @@ def valid_basic_auth(header, expected_user, expected_password):
         and hmac.compare_digest(user, expected_user)
         and hmac.compare_digest(password, expected_password)
     )
+
+
+def parse_entity_position(response):
+    match = re.search(
+        r"\[\s*(-?\d+(?:\.\d+)?)[dDfF]?,\s*(-?\d+(?:\.\d+)?)[dDfF]?,\s*(-?\d+(?:\.\d+)?)[dDfF]?\s*\]",
+        response,
+    )
+    return [round(float(value), 1) for value in match.groups()] if match else None
+
+
+def build_summon_command(entity_id, dimension, x, z, y=None):
+    if y is None:
+        return f"execute in {dimension} positioned {x} 0 {z} positioned over motion_blocking_no_leaves run summon {entity_id} ~ ~1 ~"
+    return f"execute in {dimension} run summon {entity_id} {x} {y} {z}"
+
+
+def tactical_players(names):
+    players = []
+    for name in names:
+        if not PLAYER_RE.fullmatch(name):
+            continue
+        position = parse_entity_position(rcon_command(f"data get entity {name} Pos", timeout=1.5))
+        dimension_response = rcon_command(f"data get entity {name} Dimension", timeout=1.5)
+        dimension_match = re.search(r"([a-z0-9_.-]+:[a-z0-9_./-]+)", dimension_response)
+        if position:
+            players.append({
+                "name": name,
+                "x": position[0],
+                "y": position[1],
+                "z": position[2],
+                "dimension": dimension_match.group(1) if dimension_match else "minecraft:overworld",
+            })
+    return players
 
 # Cache for telemetry to ensure lightning-fast responses
 telemetry_lock = threading.Lock()
@@ -593,6 +628,12 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             self.send_json({"messages": get_chat_feed(limit)})
             return
 
+        elif path == "/api/tactical":
+            with telemetry_lock:
+                names = list(telemetry_data.get("minecraft", {}).get("players", {}).get("list", []))
+            self.send_json({"players": tactical_players(names)})
+            return
+
         # Serve static web frontend
         if path == "/" or path == "/index.html":
             self.serve_file(WEB_DIR / "index.html", "text/html; charset=utf-8")
@@ -655,6 +696,33 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
                 # Emergency kill
                 code, stdout, stderr = run_sudo_cmd(["pkill", "-9", "-f", "forge"])
                 self.send_json({"success": True, "message": "Emergency SIGKILL dispatched to Forge processes."})
+            return
+
+        elif path == "/api/tactical/spawn":
+            entity_id = str(data.get("entity", "")).lower()
+            dimension = str(data.get("dimension", "minecraft:overworld")).lower()
+            try:
+                x = int(data.get("x"))
+                z = int(data.get("z"))
+                y = None if data.get("y") in (None, "") else int(data.get("y"))
+                count = int(data.get("count", 1))
+            except (TypeError, ValueError):
+                self.send_error_json("Coordinates and count must be whole numbers")
+                return
+            if not RESOURCE_ID_RE.fullmatch(entity_id) or not RESOURCE_ID_RE.fullmatch(dimension):
+                self.send_error_json("Invalid entity or dimension ID")
+                return
+            if abs(x) > 30000000 or abs(z) > 30000000 or (y is not None and not -2048 <= y <= 2048):
+                self.send_error_json("Coordinates are outside the allowed world range")
+                return
+            if not 1 <= count <= 10:
+                self.send_error_json("Count must be between 1 and 10")
+                return
+
+            command = build_summon_command(entity_id, dimension, x, z, y)
+            responses = [rcon_command(command) for _ in range(count)]
+            failed = any(any(word in response.lower() for word in ("error", "failed", "unable", "incorrect", "unknown", "cannot", "błąd rcon", "not configured")) for response in responses)
+            self.send_json({"success": not failed, "command": command, "responses": responses}, 500 if failed else 200)
             return
 
         elif path == "/api/rcon":

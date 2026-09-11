@@ -901,6 +901,58 @@ body.crt-scanlines::after {
   gap: 14px;
 }
 
+/* TACTICAL MAP */
+.tactical-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+}
+
+.tactical-map-panel, .spawn-panel {
+  background: #05080c;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  padding: 12px;
+}
+
+.tactical-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--neon-cyan);
+  font-size: 0.76rem;
+}
+
+.tactical-toolbar span { margin-right: auto; }
+
+#tacticalMap {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #020507;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  cursor: crosshair;
+}
+
+.spawn-panel, .spawn-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spawn-panel h3 { color: var(--neon-red); font-family: var(--font-display); }
+.spawn-panel > label { font-size: 0.72rem; color: var(--text-dim); }
+.spawn-panel input, .spawn-panel select { width: 100%; min-width: 0; }
+
+.spawn-coordinates {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.tactical-players { display: flex; flex-direction: column; gap: 5px; }
+.tactical-player { text-align: left; }
+
 .mod-card {
   background: rgba(8, 12, 18, 0.8);
   border: 1px solid rgba(0, 240, 255, 0.2);
@@ -1230,12 +1282,6 @@ body.crt-scanlines::after {
   border-radius: 4px;
   padding: 10px 14px;
   gap: 4px;
-  animation: fadeInMsg 0.2s ease-out;
-}
-
-@keyframes fadeInMsg {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .chat-card.player {
@@ -1599,6 +1645,7 @@ body.crt-scanlines::after {
 }
 
 @media (max-width: 768px) {
+  .tactical-layout { grid-template-columns: 1fr; }
   .chat-workspace {
     grid-template-columns: 1fr;
   }

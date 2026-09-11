@@ -78,6 +78,10 @@ let commandHistory = [];
 let historyIndex = -1;
 let lastLogLines = [];
 let pendingConfirmAction = null;
+let tacticalPlayers = [];
+let tacticalCenter = { x: 0, z: 0 };
+let tacticalRange = 512;
+let tacticalPolling = false;
 
 // Clock
 function updateClock() {
@@ -135,8 +139,148 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
     if (tabId === 'tab-files') browsePath(currentPath);
     if (tabId === 'tab-mods') loadModsList();
+    if (tabId === 'tab-tactical') pollTactical();
   });
 });
+
+// Tactical map and controlled mob spawning
+async function pollTactical() {
+  if (tacticalPolling || !document.getElementById('tab-tactical')?.classList.contains('active')) return;
+  tacticalPolling = true;
+  try {
+    const res = await fetch('/api/tactical');
+    const data = await res.json();
+    tacticalPlayers = data.players || [];
+    centerTacticalMap(false);
+    renderTacticalPlayers();
+  } catch (err) {
+    document.getElementById('mapStatus').textContent = `BŁĄD MAPY: ${err.message}`;
+  } finally {
+    tacticalPolling = false;
+  }
+}
+
+function visibleTacticalPlayers() {
+  const dimension = document.getElementById('spawnDimension')?.value || 'minecraft:overworld';
+  return tacticalPlayers.filter(player => player.dimension === dimension);
+}
+
+function centerTacticalMap(force = true) {
+  const players = visibleTacticalPlayers();
+  if (players.length && (force || tacticalCenter.x === 0 && tacticalCenter.z === 0)) {
+    tacticalCenter.x = players.reduce((sum, player) => sum + player.x, 0) / players.length;
+    tacticalCenter.z = players.reduce((sum, player) => sum + player.z, 0) / players.length;
+  }
+  drawTacticalMap();
+}
+
+function zoomTacticalMap(factor) {
+  tacticalRange = Math.max(64, Math.min(4096, tacticalRange * factor));
+  drawTacticalMap();
+}
+
+function drawTacticalMap() {
+  const canvas = document.getElementById('tacticalMap');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const scale = canvas.width / tacticalRange;
+  const toX = x => canvas.width / 2 + (x - tacticalCenter.x) * scale;
+  const toY = z => canvas.height / 2 + (z - tacticalCenter.z) * scale;
+  ctx.fillStyle = '#020507';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  let step = 16;
+  while (step * scale < 55) step *= 2;
+  ctx.strokeStyle = 'rgba(0, 240, 255, .16)';
+  ctx.fillStyle = '#7189a5';
+  ctx.font = '12px Consolas';
+  const left = tacticalCenter.x - canvas.width / 2 / scale;
+  const top = tacticalCenter.z - canvas.height / 2 / scale;
+  for (let x = Math.floor(left / step) * step; x <= left + tacticalRange; x += step) {
+    const px = toX(x);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height); ctx.stroke();
+    ctx.fillText(`X ${x}`, px + 4, 14);
+  }
+  for (let z = Math.floor(top / step) * step; z <= top + canvas.height / scale; z += step) {
+    const py = toY(z);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(canvas.width, py); ctx.stroke();
+    ctx.fillText(`Z ${z}`, 4, py - 4);
+  }
+
+  for (const player of visibleTacticalPlayers()) {
+    const px = toX(player.x), py = toY(player.z);
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${player.name}  Y:${Math.round(player.y)}`, px + 11, py + 4);
+  }
+
+  const x = Number(document.getElementById('spawnX')?.value);
+  const z = Number(document.getElementById('spawnZ')?.value);
+  if (Number.isFinite(x) && Number.isFinite(z)) {
+    const px = toX(x), py = toY(z);
+    ctx.strokeStyle = '#ff2a5f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px - 10, py); ctx.lineTo(px + 10, py); ctx.moveTo(px, py - 10); ctx.lineTo(px, py + 10); ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+  document.getElementById('mapStatus').textContent = `${visibleTacticalPlayers().length} GRACZY // ŚRODEK X:${Math.round(tacticalCenter.x)} Z:${Math.round(tacticalCenter.z)} // ZASIĘG ${tacticalRange}`;
+}
+
+document.getElementById('tacticalMap')?.addEventListener('click', event => {
+  const canvas = event.currentTarget;
+  const rect = canvas.getBoundingClientRect();
+  const px = (event.clientX - rect.left) * canvas.width / rect.width;
+  const py = (event.clientY - rect.top) * canvas.height / rect.height;
+  document.getElementById('spawnX').value = Math.round(tacticalCenter.x + (px - canvas.width / 2) * tacticalRange / canvas.width);
+  document.getElementById('spawnZ').value = Math.round(tacticalCenter.z + (py - canvas.height / 2) * tacticalRange / canvas.width);
+  drawTacticalMap();
+});
+
+function renderTacticalPlayers() {
+  const target = document.getElementById('tacticalPlayers');
+  if (!target) return;
+  target.innerHTML = visibleTacticalPlayers().map(player =>
+    `<button class="cyber-btn-mini tactical-player" type="button" onclick="selectPlayerPosition('${escapeHtml(player.name)}')">● ${escapeHtml(player.name)} — X:${Math.round(player.x)} Y:${Math.round(player.y)} Z:${Math.round(player.z)}</button>`
+  ).join('') || '<span class="section-desc">Brak graczy w tym wymiarze.</span>';
+}
+
+function selectPlayerPosition(name) {
+  const player = tacticalPlayers.find(item => item.name === name);
+  if (!player) return;
+  document.getElementById('spawnDimension').value = player.dimension;
+  document.getElementById('spawnX').value = Math.round(player.x);
+  document.getElementById('spawnZ').value = Math.round(player.z);
+  tacticalCenter = { x: player.x, z: player.z };
+  renderTacticalPlayers();
+  drawTacticalMap();
+}
+
+function spawnMob(event) {
+  event.preventDefault();
+  const payload = {
+    entity: document.getElementById('spawnEntity').value.trim(),
+    dimension: document.getElementById('spawnDimension').value,
+    x: document.getElementById('spawnX').value,
+    z: document.getElementById('spawnZ').value,
+    y: document.getElementById('spawnY').value,
+    count: document.getElementById('spawnCount').value
+  };
+  openConfirmModal('RESP MOBÓW', `Zrespić ${payload.count} × ${payload.entity} przy X:${payload.x} Z:${payload.z}?`, () => executeMobSpawn(payload));
+}
+
+async function executeMobSpawn(payload) {
+  closeConfirmModal();
+  try {
+    const res = await fetch('/api/tactical/spawn', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    showToast(data.success ? `✔ Zrespiono ${payload.count} × ${payload.entity}` : `✖ ${data.error || data.responses?.[0] || 'Respawn nieudany'}`);
+    playCyberSound(data.success ? 'success' : 'alert');
+  } catch (err) {
+    showToast(`✖ Błąd sieci: ${err.message}`);
+  }
+}
 
 // Format bytes
 function formatBytes(bytes, decimals = 1) {
@@ -751,6 +895,7 @@ window.addEventListener('keydown', (e) => {
 // CHAT SUBSYSTEM // LIVE PLAYER MESSENGER
 // =========================================
 let lastChatMsgIds = new Set();
+let lastChatRenderKey = '';
 let chatSoundEnabled = true;
 let unreadChatCount = 0;
 let selectedChatMode = 'chat';
@@ -786,6 +931,9 @@ async function pollChat() {
 function renderChatFeed(messages) {
   const stream = document.getElementById('chatStream');
   if (!stream) return;
+  const renderKey = messages.map(message => message.id).join('|');
+  if (renderKey === lastChatRenderKey) return;
+  lastChatRenderKey = renderKey;
 
   if (messages.length === 0) {
     stream.innerHTML = '<div class="chat-system-event">Czat serwera jest czysty. Napisz pierwszą wiadomość!</div>';
@@ -997,4 +1145,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Loop for log streaming (2.5s)
   setInterval(pollLogs, 2500);
+
+  setInterval(pollTactical, 3000);
 });
