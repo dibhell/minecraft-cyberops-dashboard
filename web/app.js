@@ -79,6 +79,7 @@ let historyIndex = -1;
 let lastLogLines = [];
 let pendingConfirmAction = null;
 let tacticalPlayers = [];
+let tacticalMobs = [];
 let tacticalCenter = { x: 0, z: 0 };
 let tacticalRange = 512;
 let tacticalPolling = false;
@@ -148,9 +149,11 @@ async function pollTactical() {
   if (tacticalPolling || !document.getElementById('tab-tactical')?.classList.contains('active')) return;
   tacticalPolling = true;
   try {
-    const res = await fetch('/api/tactical');
+    const dimension = document.getElementById('spawnDimension')?.value || 'minecraft:overworld';
+    const res = await fetch(`/api/tactical?dimension=${encodeURIComponent(dimension)}`);
     const data = await res.json();
     tacticalPlayers = data.players || [];
+    tacticalMobs = data.mobs || [];
     centerTacticalMap(false);
     renderTacticalPlayers();
   } catch (err) {
@@ -215,6 +218,14 @@ function drawTacticalMap() {
     ctx.fillText(`${player.name}  Y:${Math.round(player.y)}`, px + 11, py + 4);
   }
 
+  for (const mob of tacticalMobs) {
+    const px = toX(mob.x), py = toY(mob.z);
+    ctx.fillStyle = '#ff2a5f';
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffb3c5';
+    ctx.fillText(`MOB #${mob.id}  Y:${Math.round(mob.y)}`, px + 11, py + 4);
+  }
+
   const x = Number(document.getElementById('spawnX')?.value);
   const z = Number(document.getElementById('spawnZ')?.value);
   if (Number.isFinite(x) && Number.isFinite(z)) {
@@ -223,7 +234,7 @@ function drawTacticalMap() {
     ctx.beginPath(); ctx.moveTo(px - 10, py); ctx.lineTo(px + 10, py); ctx.moveTo(px, py - 10); ctx.lineTo(px, py + 10); ctx.stroke();
     ctx.lineWidth = 1;
   }
-  document.getElementById('mapStatus').textContent = `${visibleTacticalPlayers().length} GRACZY // ŚRODEK X:${Math.round(tacticalCenter.x)} Z:${Math.round(tacticalCenter.z)} // ZASIĘG ${tacticalRange}`;
+  document.getElementById('mapStatus').textContent = `${visibleTacticalPlayers().length} GRACZY // ${tacticalMobs.length} ŚLEDZONYCH MOBÓW // ŚRODEK X:${Math.round(tacticalCenter.x)} Z:${Math.round(tacticalCenter.z)} // ZASIĘG ${tacticalRange}`;
 }
 
 document.getElementById('tacticalMap')?.addEventListener('click', event => {
@@ -277,6 +288,7 @@ async function executeMobSpawn(payload) {
     const data = await res.json();
     showToast(data.success ? `✔ Zrespiono ${payload.count} × ${payload.entity}` : `✖ ${data.error || data.responses?.[0] || 'Respawn nieudany'}`);
     playCyberSound(data.success ? 'success' : 'alert');
+    if (data.success) await pollTactical();
   } catch (err) {
     showToast(`✖ Błąd sieci: ${err.message}`);
   }

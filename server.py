@@ -88,10 +88,20 @@ def parse_entity_position(response):
     return [round(float(value), 1) for value in match.groups()] if match else None
 
 
+def parse_entity_positions(response):
+    return [
+        [round(float(value), 1) for value in match.groups()]
+        for match in re.finditer(
+            r"\[\s*(-?\d+(?:\.\d+)?)[dDfF]?,\s*(-?\d+(?:\.\d+)?)[dDfF]?,\s*(-?\d+(?:\.\d+)?)[dDfF]?\s*\]",
+            response,
+        )
+    ]
+
+
 def build_summon_command(entity_id, dimension, x, z, y=None):
     if y is None:
-        return f"execute in {dimension} positioned {x} 0 {z} positioned over motion_blocking_no_leaves run summon {entity_id} ~ ~1 ~"
-    return f"execute in {dimension} run summon {entity_id} {x} {y} {z}"
+        return f'execute in {dimension} positioned {x} 0 {z} positioned over motion_blocking_no_leaves run summon {entity_id} ~ ~1 ~ {{Tags:["cyberops_tracked"]}}'
+    return f'execute in {dimension} run summon {entity_id} {x} {y} {z} {{Tags:["cyberops_tracked"]}}'
 
 
 def tactical_players(names):
@@ -111,6 +121,17 @@ def tactical_players(names):
                 "dimension": dimension_match.group(1) if dimension_match else "minecraft:overworld",
             })
     return players
+
+
+def tactical_mobs(dimension):
+    response = rcon_command(
+        f"execute in {dimension} as @e[tag=cyberops_tracked] run data get entity @s Pos",
+        timeout=2.0,
+    )
+    return [
+        {"id": index, "x": position[0], "y": position[1], "z": position[2], "dimension": dimension}
+        for index, position in enumerate(parse_entity_positions(response), 1)
+    ]
 
 # Cache for telemetry to ensure lightning-fast responses
 telemetry_lock = threading.Lock()
@@ -629,9 +650,13 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             return
 
         elif path == "/api/tactical":
+            dimension = query.get("dimension", ["minecraft:overworld"])[0].lower()
+            if not RESOURCE_ID_RE.fullmatch(dimension):
+                self.send_error_json("Invalid dimension ID")
+                return
             with telemetry_lock:
                 names = list(telemetry_data.get("minecraft", {}).get("players", {}).get("list", []))
-            self.send_json({"players": tactical_players(names)})
+            self.send_json({"players": tactical_players(names), "mobs": tactical_mobs(dimension)})
             return
 
         # Serve static web frontend
