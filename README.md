@@ -40,6 +40,7 @@ Działa bezpośrednio na maszynie serwera (Linux Ubuntu/Debian) i umożliwia pe�
   - Szybkie wyłączanie/włączanie modów (`.jar` ↔ `.jar.disabled`) bez ich usuwania.
 * 🔒 **Dostęp chroniony:** cały panel i API wymagają loginu i hasła HTTP Basic.
 * 🗺️ **Mapa taktyczna:** schematyczny rzut terenu z wodą, roślinnością i wysokością, pozycje graczy oraz kontrolowany respawn i tracking mobów.
+* 🌸 **Panel Mamy:** mobilny widok `/mama` na iOS z czatem, gotowymi komunikatami i osobnym, ograniczonym kontem.
 * 🎨 **Aestetyka Cyberpunk / Sci-Fi Terminal:**
   - Przełącznik CRT Scanlines (efekt monitora kineskopowego).
   - Wbudowany syntezator dźwięków kliknięć i potwierdzeń (Web Audio API, bez zewnętrznych plików audio!).

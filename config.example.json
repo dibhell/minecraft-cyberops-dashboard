@@ -3,5 +3,7 @@
   "sudo_pass": "YOUR_SUDO_PASSWORD_HERE",
   "port": 8080,
   "auth_user": "admin",
-  "auth_password": "CHANGE_THIS_TO_A_LONG_RANDOM_PASSWORD"
+  "auth_password": "CHANGE_THIS_TO_A_LONG_RANDOM_PASSWORD",
+  "mom_user": "mama",
+  "mom_password": "CHANGE_THIS_TO_A_DIFFERENT_PASSWORD"
 }

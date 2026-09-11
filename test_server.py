@@ -23,9 +23,16 @@ class ModUploadValidationTest(unittest.TestCase):
 
     def test_basic_auth(self):
         token = base64.b64encode(b"admin:secret").decode("ascii")
+        mom_token = base64.b64encode(b"mama:rose").decode("ascii")
         self.assertTrue(server.valid_basic_auth(f"Basic {token}", "admin", "secret"))
         self.assertFalse(server.valid_basic_auth(f"Basic {token}", "admin", "wrong"))
         self.assertFalse(server.valid_basic_auth("garbage", "admin", "secret"))
+        self.assertTrue(server.valid_route_auth(f"Basic {mom_token}", "/api/mama/state", "admin", "secret", "mama", "rose"))
+        self.assertFalse(server.valid_route_auth(f"Basic {mom_token}", "/api/status", "admin", "secret", "mama", "rose"))
+        mom = "Basic " + base64.b64encode(b"mama:obiad").decode("ascii")
+        self.assertTrue(server.valid_route_auth(mom, "/mama", "admin", "secret", "mama", "obiad"))
+        self.assertFalse(server.valid_route_auth(mom, "/api/status", "admin", "secret", "mama", "obiad"))
+        self.assertFalse(server.is_mom_route("/mamaevil"))
 
     def test_tactical_command_is_bounded(self):
         self.assertEqual(server.parse_entity_position("Player has data: [12.5d, 64.0d, -7.25d]"), [12.5, 64.0, -7.2])

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#fff5f7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Panel Mamy</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #33272a; background: #fff8fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); -webkit-text-size-adjust: 100%; }
+    main { width: min(100%, 680px); margin: auto; display: grid; gap: 16px; }
+    header, section { background: #fff; border: 1px solid #f0dce2; border-radius: 18px; padding: 18px; box-shadow: 0 8px 28px #7b334414; }
+    h1 { margin: 0 0 6px; font-size: clamp(26px, 8vw, 38px); color: #a72e55; }
+    p { margin: 4px 0; color: #705960; }
+    .status { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .online { color: #16784b; font-weight: 700; }
+    label { display: grid; gap: 6px; font-weight: 700; }
+    select, textarea, button { width: 100%; min-height: 48px; border-radius: 12px; font: inherit; font-size: 16px; }
+    select, textarea { border: 1px solid #d9c3ca; background: #fff; padding: 12px; color: #33272a; }
+    textarea { min-height: 108px; resize: vertical; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { border: 0; padding: 12px 14px; font-weight: 750; cursor: pointer; touch-action: manipulation; }
+    .preset { background: #fff0f4; color: #8c2949; border: 1px solid #f0c6d3; }
+    .send { background: #a72e55; color: #fff; min-height: 56px; font-size: 18px; }
+    form { display: grid; gap: 14px; }
+    #notice { min-height: 24px; font-weight: 700; color: #16784b; }
+    .chat { display: grid; gap: 9px; max-height: 42vh; overflow: auto; overscroll-behavior: contain; }
+    .message { background: #faf5f7; border-radius: 12px; padding: 10px 12px; }
+    .message.mama { background: #fff0f5; border-left: 4px solid #c73d6a; }
+    .meta { display: flex; justify-content: space-between; gap: 12px; color: #806b71; font-size: 13px; margin-bottom: 3px; }
+    .empty { text-align: center; padding: 20px; color: #806b71; }
+    @media (max-width: 520px) { .fields, .presets { grid-template-columns: 1fr; } header, section { padding: 15px; border-radius: 14px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="status"><div><h1>Panel Mamy 🌸</h1><p>Wiadomości prosto do Minecrafta</p></div><div id="online" class="online">Łączenie…</div></div>
+    </header>
+
+    <section>
+      <form id="messageForm">
+        <div class="fields">
+          <label>Do kogo?
+            <select id="target"><option value="@a">Wszyscy gracze</option></select>
+          </label>
+          <label>Jak pokazać?
+            <select id="mode"><option value="chat">Na czacie</option><option value="actionbar">Pasek na ekranie</option><option value="title">Duży napis</option></select>
+          </label>
+        </div>
+        <div class="presets">
+          <button class="preset" type="button" data-text="Obiad gotowy! Zapraszam 🍽️">🍽️ Obiad gotowy</button>
+          <button class="preset" type="button" data-text="Kończymy grę za 10 minut.">⏰ Jeszcze 10 minut</button>
+          <button class="preset" type="button" data-text="Kończymy grę za 5 minut.">⏳ Jeszcze 5 minut</button>
+          <button class="preset" type="button" data-text="Proszę zapisać grę i już kończyć.">🛑 Czas kończyć</button>
+        </div>
+        <label>Wiadomość od Mamy
+          <textarea id="text" maxlength="240" placeholder="Napisz wiadomość…" required></textarea>
+        </label>
+        <button class="send" type="submit">Wyślij jako [Mama]</button>
+        <div id="notice" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Rozmowa</h2>
+      <div id="chat" class="chat"><div class="empty">Pobieranie wiadomości…</div></div>
+    </section>
+  </main>
+  <script>
+    const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    let renderKey = '';
+
+    document.querySelectorAll('[data-text]').forEach(button => button.addEventListener('click', () => {
+      document.getElementById('text').value = button.dataset.text;
+      document.getElementById('text').focus();
+    }));
+
+    async function refresh() {
+      try {
+        const response = await fetch('/api/mama/state');
+        if (!response.ok) throw new Error('Brak połączenia');
+        const data = await response.json();
+        const players = data.players || {count: 0, max: 8, list: []};
+        document.getElementById('online').textContent = `${players.count} / ${players.max} online`;
+        const target = document.getElementById('target');
+        const selected = target.value;
+        target.innerHTML = '<option value="@a">Wszyscy gracze</option>' + players.list.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+        if (players.list.includes(selected)) target.value = selected;
+
+        const messages = data.messages || [];
+        const key = messages.map(message => message.id).join('|');
+        if (key === renderKey) return;
+        renderKey = key;
+        const chat = document.getElementById('chat');
+        const nearBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 80;
+        chat.innerHTML = messages.map(message => {
+          const sender = message.sender || (message.type === 'event' ? 'Serwer' : 'Gracz');
+          return `<div class="message ${sender === 'Mama' ? 'mama' : ''}"><div class="meta"><strong>${escapeHtml(sender)}</strong><span>${escapeHtml(message.time)}</span></div><div>${escapeHtml(message.text)}</div></div>`;
+        }).join('') || '<div class="empty">Brak wiadomości.</div>';
+        if (nearBottom) chat.scrollTop = chat.scrollHeight;
+      } catch (_) {
+        document.getElementById('online').textContent = 'Brak połączenia';
+      }
+    }
+
+    document.getElementById('messageForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const notice = document.getElementById('notice');
+      const button = document.querySelector('.send');
+      button.disabled = true;
+      notice.textContent = 'Wysyłanie…';
+      try {
+        const response = await fetch('/api/mama/send', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text:document.getElementById('text').value, target:document.getElementById('target').value, mode:document.getElementById('mode').value})});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Nie udało się wysłać');
+        document.getElementById('text').value = '';
+        notice.textContent = '✓ Wiadomość wysłana do gry';
+        await refresh();
+      } catch (error) {
+        notice.textContent = `Błąd: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>

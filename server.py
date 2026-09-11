@@ -31,7 +31,9 @@ DEFAULT_CONFIG = {
     "sudo_pass": "",
     "port": 8080,
     "auth_user": "admin",
-    "auth_password": ""
+    "auth_password": "",
+    "mom_user": "mama",
+    "mom_password": ""
 }
 
 _cfg = dict(DEFAULT_CONFIG)
@@ -47,6 +49,8 @@ SUDO_PASS = os.environ.get("SUDO_PASS", _cfg["sudo_pass"])
 PORT = int(os.environ.get("PORT", _cfg["port"]))
 AUTH_USER = os.environ.get("DASHBOARD_USER", _cfg["auth_user"])
 AUTH_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", _cfg["auth_password"])
+MOM_USER = os.environ.get("MOM_USER", _cfg["mom_user"])
+MOM_PASSWORD = os.environ.get("MOM_PASSWORD", _cfg["mom_password"])
 WEB_DIR = Path(__file__).resolve().parent / "web"
 MAX_MOD_BYTES = 256 * 1024 * 1024
 MOD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+() -]{0,179}\.jar$", re.IGNORECASE)
@@ -81,6 +85,17 @@ def valid_basic_auth(header, expected_user, expected_password):
         and hmac.compare_digest(user, expected_user)
         and hmac.compare_digest(password, expected_password)
     )
+
+
+def is_mom_route(path):
+    return path in ("/mama", "/mama/") or path.startswith("/api/mama/")
+
+
+def valid_route_auth(header, path, admin_user, admin_password, mom_user, mom_password):
+    admin = valid_basic_auth(header, admin_user, admin_password)
+    if not is_mom_route(path):
+        return admin
+    return admin or bool(mom_password) and valid_basic_auth(header, mom_user, mom_password)
 
 
 def parse_entity_position(response):
@@ -512,10 +527,12 @@ def telemetry_poller():
 
 class CyberHandler(http.server.BaseHTTPRequestHandler):
     def is_authorized(self):
-        if valid_basic_auth(self.headers.get("Authorization", ""), AUTH_USER, AUTH_PASSWORD):
+        path = urlparse(self.path).path
+        if valid_route_auth(self.headers.get("Authorization", ""), path, AUTH_USER, AUTH_PASSWORD, MOM_USER, MOM_PASSWORD):
             return True
         self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Minecraft Cyber-Ops", charset="UTF-8"')
+        realm = "Panel Mamy" if is_mom_route(path) else "Minecraft Cyber-Ops"
+        self.send_header("WWW-Authenticate", f'Basic realm="{realm}", charset="UTF-8"')
         self.send_header("Content-Length", "0")
         self.end_headers()
         return False
@@ -544,6 +561,16 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+
+        if path in ("/mama", "/mama/"):
+            self.serve_file(WEB_DIR / "mama.html", "text/html; charset=utf-8")
+            return
+
+        if path == "/api/mama/state":
+            with telemetry_lock:
+                players = dict(telemetry_data.get("minecraft", {}).get("players", {"count": 0, "max": 8, "list": []}))
+            self.send_json({"players": players, "messages": get_chat_feed(40)})
+            return
 
         if path == "/api/status":
             with telemetry_lock:
@@ -736,6 +763,41 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             data = json.loads(body)
         except Exception:
             data = {}
+
+        if path == "/api/mama/send":
+            text = str(data.get("text", "")).strip()
+            target = str(data.get("target", "@a")).strip()
+            mode = str(data.get("mode", "chat")).strip()
+            if not text or len(text) > 240:
+                self.send_error_json("Wiadomość musi mieć od 1 do 240 znaków.")
+                return
+            if target != "@a" and not PLAYER_RE.fullmatch(target):
+                self.send_error_json("Nieprawidłowy odbiorca.")
+                return
+            if mode not in ("chat", "title", "actionbar"):
+                self.send_error_json("Nieprawidłowy tryb wiadomości.")
+                return
+            message = json.dumps(f"[Mama] {text}", ensure_ascii=False)
+            if mode == "title":
+                command = f'title {target} title {{"text":{message},"color":"light_purple","bold":true}}'
+            elif mode == "actionbar":
+                command = f'title {target} actionbar {{"text":{message},"color":"light_purple","bold":true}}'
+            else:
+                command = f'tellraw {target} {{"text":{message},"color":"light_purple","bold":true}}'
+            response = rcon_command(command)
+            failed = any(word in response.lower() for word in ("error", "failed", "incorrect", "unknown", "błąd rcon", "not configured", "no player"))
+            if failed:
+                self.send_error_json(response, 502)
+                return
+            with admin_chat_lock:
+                admin_chat_messages.append({
+                    "id": f"mom_{time.time()}", "time": time.strftime("%H:%M:%S"), "type": "admin",
+                    "sender": "Mama", "text": text, "mode": mode, "target": target
+                })
+                if len(admin_chat_messages) > 120:
+                    admin_chat_messages.pop(0)
+            self.send_json({"success": True, "message": "Wiadomość wysłana jako Mama."})
+            return
 
         if path == "/api/server/control":
             action = data.get("action", "")
