@@ -884,11 +884,17 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/server/control":
             action = data.get("action", "")
-            if action not in ["start", "stop", "restart", "kill"]:
-                self.send_error_json("Invalid action. Must be start, stop, restart, or kill.")
+            if action not in ["start", "stop", "restart", "kill", "restart_playit"]:
+                self.send_error_json("Invalid server control action.")
                 return
 
-            if action in ["start", "stop", "restart"]:
+            if action == "restart_playit":
+                code, stdout, stderr = run_sudo_cmd(["systemctl", "restart", "playit.service"])
+                if code == 0:
+                    self.send_json({"success": True, "message": "Tunel Playit został zrestartowany.", "output": stdout})
+                else:
+                    self.send_json({"success": False, "message": "Nie udało się zrestartować tunelu Playit.", "error": stderr}, 500)
+            elif action in ["start", "stop", "restart"]:
                 code, stdout, stderr = run_sudo_cmd(["systemctl", action, "minecraft.service"])
                 if code == 0:
                     self.send_json({"success": True, "message": f"Server {action} initiated successfully.", "output": stdout})

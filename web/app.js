@@ -628,6 +628,12 @@ function triggerServerAction(action) {
       'Zrestartować serwer Minecraft Forge? Wszelkie zmiany w modach zostaną załadowane, a paczka AutoModpack zaktualizowana.',
       () => executeServerControl('restart')
     );
+  } else if (action === 'restart_playit') {
+    openConfirmModal(
+      'RESTART TUNELU PLAYIT',
+      'Zrestartować publiczny tunel Playit? Połączenia graczy z zewnątrz mogą zostać na chwilę przerwane.',
+      () => executeServerControl('restart_playit')
+    );
   } else {
     executeServerControl('start');
   }
