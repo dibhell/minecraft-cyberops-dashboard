@@ -1281,11 +1281,135 @@ function renderOnlinePlayersInChat(players) {
         <button type="button" class="player-act-btn" onclick="startWhisperTo('${escapeHtml(p)}')">💬 PW</button>
         <button type="button" class="player-act-btn" onclick="sendRcon('tp ${escapeHtml(p)} ~ ~ ~')">⚡ TP</button>
         <button type="button" class="player-act-btn" onclick="sendRcon('give ${escapeHtml(p)} diamond 1')">💎 Diament</button>
+        <button type="button" class="player-act-btn" onclick="quickWhitelistAdd('${escapeHtml(p)}')">🛡️ +WL</button>
         <button type="button" class="player-act-btn" onclick="sendRcon('op ${escapeHtml(p)}')">⭐ OP</button>
         <button type="button" class="player-act-btn btn-stop" onclick="sendRcon('kick ${escapeHtml(p)} Kick od Admina')">👢 Kick</button>
       </div>
     </div>
   `).join('');
+}
+
+// Whitelist management
+async function handleWhitelistAdd(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('whitelistNickInput');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return;
+
+  if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) {
+    showToast('Nick musi mieć 1–16 znaków (litery, cyfry, _).');
+    return;
+  }
+
+  await manageWhitelist('add', name);
+  input.value = '';
+}
+
+async function quickWhitelistAdd(name) {
+  if (!name) return;
+  await manageWhitelist('add', name);
+}
+
+async function manageWhitelist(action, name = '') {
+  playCyberSound('click');
+  const input = document.getElementById('whitelistNickInput');
+  if (action === 'remove' && !name && input) {
+    name = input.value.trim();
+    if (!name) {
+      showToast('Wpisz nick gracza do usunięcia.');
+      input.focus();
+      return;
+    }
+  }
+
+  const actionLabels = {
+    add: `Dodawanie ${name} do białej listy...`,
+    remove: `Usuwanie ${name} z białej listy...`,
+    list: 'Pobieranie listy whitelisty...',
+    on: 'Włączanie sprawdzania whitelisty...',
+    off: 'Wyłączanie sprawdzania whitelisty...',
+    reload: 'Przeładowywanie pliku whitelist.json...'
+  };
+
+  appendConsoleDirect(`[WHITELIST] ${actionLabels[action] || action}`, 'special');
+
+  try {
+    const res = await fetch('/api/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, name })
+    });
+    const data = await res.json();
+    if (data.response) {
+      appendConsoleDirect(`[SERVER <<] ${data.response}`, data.success ? 'info' : 'error');
+      showToast(data.response.slice(0, 80));
+    } else if (data.error) {
+      appendConsoleDirect(`[BŁĄD] ${data.error}`, 'error');
+      showToast(`Błąd: ${data.error}`);
+    }
+  } catch (err) {
+    appendConsoleDirect(`[BŁĄD SIECI] ${err.message}`, 'error');
+    showToast(`Błąd sieci: ${err.message}`);
+  }
+}
+
+// Weather actions
+async function setWeather(type) {
+  playCyberSound('click');
+  const sel = document.getElementById('weatherDurationSelect');
+  const duration = sel ? sel.value : '';
+
+  const weatherLabels = {
+    clear: '☀️ Bezchmurnie',
+    rain: '🌧️ Deszcz',
+    thunder: '⛈️ Burza z Piorunami'
+  };
+
+  appendConsoleDirect(`[POGODA] Ustawianie: ${weatherLabels[type] || type}${duration ? ` (czas: ${duration}s)` : ''}`, 'special');
+
+  try {
+    const res = await fetch('/api/weather', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, duration })
+    });
+    const data = await res.json();
+    if (data.response) {
+      appendConsoleDirect(`[SERVER <<] ${data.response}`, data.success ? 'info' : 'error');
+      showToast(data.response.slice(0, 80));
+    } else if (data.error) {
+      appendConsoleDirect(`[BŁĄD] ${data.error}`, 'error');
+      showToast(`Błąd: ${data.error}`);
+    }
+  } catch (err) {
+    appendConsoleDirect(`[BŁĄD SIECI] ${err.message}`, 'error');
+    showToast(`Błąd sieci: ${err.message}`);
+  }
+}
+
+async function toggleWeatherCycle(enable) {
+  playCyberSound('click');
+  appendConsoleDirect(`[POGODA] ${enable ? 'Wznawianie naturalnego cyklu pogody' : 'Zatrzymywanie cyklu pogody (stała aura)'}`, 'special');
+
+  try {
+    const res = await fetch('/api/weather', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cycle: enable })
+    });
+    const data = await res.json();
+    if (data.response) {
+      appendConsoleDirect(`[SERVER <<] ${data.response}`, data.success ? 'info' : 'error');
+      showToast(data.response.slice(0, 80));
+    } else if (data.error) {
+      appendConsoleDirect(`[BŁĄD] ${data.error}`, 'error');
+      showToast(`Błąd: ${data.error}`);
+    }
+  } catch (err) {
+    appendConsoleDirect(`[BŁĄD SIECI] ${err.message}`, 'error');
+    showToast(`Błąd sieci: ${err.message}`);
+  }
 }
 
 function startWhisperTo(player) {

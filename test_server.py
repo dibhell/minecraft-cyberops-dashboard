@@ -61,6 +61,16 @@ class ModUploadValidationTest(unittest.TestCase):
         self.assertEqual(server.rapl_delta_uj(900, 950, 1000), 50)
         self.assertEqual(server.rapl_delta_uj(950, 25, 1000), 75)
 
+    def test_player_nick_and_whitelist_rules(self):
+        self.assertTrue(server.PLAYER_RE.fullmatch("Steve"))
+        self.assertTrue(server.PLAYER_RE.fullmatch("Player_123"))
+        self.assertTrue(server.PLAYER_RE.fullmatch("Mama_123"))
+        self.assertFalse(server.PLAYER_RE.fullmatch(""))
+        self.assertFalse(server.PLAYER_RE.fullmatch("nick with spaces"))
+        self.assertFalse(server.PLAYER_RE.fullmatch("too_long_nickname_exceeding_16"))
+        self.assertFalse(server.PLAYER_RE.fullmatch("evil;drop"))
+
+
 
 if __name__ == "__main__":
     unittest.main()

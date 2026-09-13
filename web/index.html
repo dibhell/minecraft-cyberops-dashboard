@@ -308,11 +308,58 @@
               <div class="empty-players-msg">Brak graczy online</div>
             </div>
 
+            <!-- WHITELIST MANAGEMENT -->
+            <div class="sidebar-box whitelist-box">
+              <div class="sidebar-box-header">
+                <span class="sidebar-box-title">🛡️ BIAŁA LISTA (WHITELIST)</span>
+              </div>
+              <form id="whitelistForm" class="whitelist-form" onsubmit="handleWhitelistAdd(event)">
+                <div class="sidebar-input-row">
+                  <input type="text" id="whitelistNickInput" class="sidebar-mini-input" placeholder="Wpisz nick gracza..." autocomplete="off" maxlength="16" pattern="[A-Za-z0-9_]{1,16}">
+                  <button type="submit" class="cyber-btn-mini btn-wl-add" title="Dodaj gracza do białej listy">+ DODAJ</button>
+                </div>
+              </form>
+              <div class="whitelist-actions-grid">
+                <button type="button" class="sidebar-chip-btn" onclick="manageWhitelist('list')" title="Pokaż listę graczy na białej liście">📋 Lista</button>
+                <button type="button" class="sidebar-chip-btn" onclick="manageWhitelist('remove')" title="Usuń wpisany nick z białej listy">➖ Usuń</button>
+                <button type="button" class="sidebar-chip-btn" onclick="manageWhitelist('on')" title="Włącz białą listę">🟢 Włącz</button>
+                <button type="button" class="sidebar-chip-btn" onclick="manageWhitelist('off')" title="Wyłącz białą listę">🔴 Wyłącz</button>
+                <button type="button" class="sidebar-chip-btn" onclick="manageWhitelist('reload')" title="Przeładuj plik whitelist.json">🔄 Reload</button>
+              </div>
+            </div>
+
+            <!-- WEATHER CONTROL -->
+            <div class="sidebar-box weather-box">
+              <div class="sidebar-box-header">
+                <span class="sidebar-box-title">🌤️ STEROWANIE POGODĄ</span>
+              </div>
+              <div class="weather-duration-row">
+                <span class="weather-lbl">CZAS:</span>
+                <select id="weatherDurationSelect" class="sidebar-mini-select" title="Wybierz czas trwania aury">
+                  <option value="">Domyślny</option>
+                  <option value="300">5 minut</option>
+                  <option value="900">15 minut</option>
+                  <option value="1800">30 minut</option>
+                  <option value="3600">1 godzina</option>
+                  <option value="24000">1 dzień gry</option>
+                </select>
+              </div>
+              <div class="weather-btn-grid">
+                <button type="button" class="perk-btn weather-type-btn" onclick="setWeather('clear')" title="Ustaw słoneczną, bezchmurną pogodę">☀️ Bezchmurnie</button>
+                <button type="button" class="perk-btn weather-type-btn" onclick="setWeather('rain')" title="Ustaw opady deszczu">🌧️ Deszcz</button>
+                <button type="button" class="perk-btn weather-type-btn" onclick="setWeather('thunder')" title="Ustaw gwałtowną burzę z piorunami">⛈️ Burza</button>
+              </div>
+              <div class="weather-cycle-row">
+                <button type="button" class="sidebar-chip-btn cycle-btn" onclick="toggleWeatherCycle(false)" title="Zatrzymaj cykl pogody (gamerule doWeatherCycle false)">🔒 Zablokuj cykl</button>
+                <button type="button" class="sidebar-chip-btn cycle-btn" onclick="toggleWeatherCycle(true)" title="Wznów naturalny cykl pogody (gamerule doWeatherCycle true)">🔄 Wznów cykl</button>
+              </div>
+            </div>
+
             <div class="admin-perks-box">
               <div class="perks-title">SZYBKIE AKCJE ADMINA</div>
               <div class="perks-grid">
                 <button type="button" class="perk-btn" onclick="sendRcon('time set day')">☀️ Ustaw Dzień</button>
-                <button type="button" class="perk-btn" onclick="sendRcon('weather clear')">🌤️ Czyste Niebo</button>
+                <button type="button" class="perk-btn" onclick="sendRcon('time set night')">🌙 Ustaw Noc</button>
                 <button type="button" class="perk-btn" onclick="sendRcon('difficulty peaceful')">🕊️ Pokojowy</button>
                 <button type="button" class="perk-btn" onclick="sendRcon('difficulty hard')">💀 Poziom Hard</button>
                 <button type="button" class="perk-btn" onclick="sendRcon('give @a diamond 2')">💎 Diamenty (@a)</button>

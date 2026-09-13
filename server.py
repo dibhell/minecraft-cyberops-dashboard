@@ -867,6 +867,47 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             responses = [rcon_command(command) for _ in range(count)]
             failed = any(any(word in response.lower() for word in ("error", "failed", "unable", "incorrect", "unknown", "cannot", "błąd rcon", "not configured")) for response in responses)
             self.send_json({"success": not failed, "command": command, "responses": responses}, 500 if failed else 200)
+        elif path == "/api/whitelist":
+            action = str(data.get("action", "")).lower().strip()
+            name = str(data.get("name", "")).strip()
+            if action not in {"add", "remove", "on", "off", "list", "reload"}:
+                self.send_error_json("Nieprawidłowa akcja whitelisty.")
+                return
+            if action in {"add", "remove"} and not PLAYER_RE.fullmatch(name):
+                self.send_error_json("Nick musi mieć 1–16 znaków: litery, cyfry lub _.")
+                return
+            command = f"whitelist {action}" + (f" {name}" if name else "")
+            response = rcon_command(command)
+            failed = any(word in response.lower() for word in ("error", "failed", "unable", "incorrect", "unknown", "cannot", "błąd rcon", "not configured"))
+            self.send_json({"success": not failed, "response": response, "command": command})
+            return
+
+        elif path == "/api/weather":
+            cycle = data.get("cycle", None)
+            if cycle is not None:
+                cmd = f"gamerule doWeatherCycle {'true' if cycle else 'false'}"
+                response = rcon_command(cmd)
+                failed = any(word in response.lower() for word in ("error", "failed", "unable", "błąd rcon", "not configured"))
+                self.send_json({"success": not failed, "response": response, "command": cmd})
+                return
+
+            w_type = str(data.get("type", "")).lower().strip()
+            duration = str(data.get("duration", "")).strip()
+            if w_type not in {"clear", "rain", "thunder"}:
+                self.send_error_json("Nieprawidłowy typ pogody (dozwolone: clear, rain, thunder).")
+                return
+
+            if duration:
+                if not duration.isdigit() or not (1 <= int(duration) <= 1000000):
+                    self.send_error_json("Czas trwania musi być liczbą sekund (1–1000000).")
+                    return
+                cmd = f"weather {w_type} {duration}"
+            else:
+                cmd = f"weather {w_type}"
+
+            response = rcon_command(cmd)
+            failed = any(word in response.lower() for word in ("error", "failed", "unable", "błąd rcon", "not configured"))
+            self.send_json({"success": not failed, "response": response, "command": cmd})
             return
 
         elif path == "/api/rcon":

@@ -1,0 +1,3 @@
+[constraints]
+max_cycles = 0
+no_god_files = true
