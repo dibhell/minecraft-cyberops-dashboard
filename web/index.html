@@ -180,10 +180,16 @@
           <span class="btn-icon">↺</span>
           <span class="btn-text">RESTARTUJ SERWER</span>
         </button>
-        <button id="btnRestartPlayit" type="button" class="cyber-btn btn-playit" onclick="triggerServerAction('restart_playit')">
-          <span class="btn-icon" aria-hidden="true">↻</span>
-          <span class="btn-text">RESTARTUJ PLAYIT</span>
-        </button>
+        <div class="playit-control">
+          <button id="btnRestartPlayit" type="button" class="cyber-btn btn-playit" onclick="triggerServerAction('restart_playit')">
+            <span class="btn-icon" aria-hidden="true">↻</span>
+            <span class="btn-text">RESTARTUJ PLAYIT</span>
+          </button>
+          <div id="playitStatus" class="playit-status checking" role="status" aria-live="polite" aria-atomic="true">
+            <span class="playit-status-dot" aria-hidden="true"></span>
+            <span id="playitStatusText">PLAYIT: SPRAWDZANIE...</span>
+          </div>
+        </div>
         <button id="btnStop" class="cyber-btn btn-stop" onclick="triggerServerAction('stop')">
           <span class="btn-icon">■</span>
           <span class="btn-text">ZATRZYMAJ (GRACEFUL)</span>

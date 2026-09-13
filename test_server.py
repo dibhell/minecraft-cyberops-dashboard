@@ -46,6 +46,12 @@ class ModUploadValidationTest(unittest.TestCase):
             'execute in minecraft:overworld positioned 12 0 -7 positioned over motion_blocking_no_leaves run summon crazycow:szalona_krowa_v2 ~ ~1 ~ {Tags:["cyberops_tracked"]}',
         )
 
+    def test_playit_status_states(self):
+        self.assertEqual(server.classify_playit(False, None), ("offline", "PLAYIT: WYŁĄCZONY"))
+        self.assertEqual(server.classify_playit(True, True), ("online", "PLAYIT: ONLINE"))
+        self.assertEqual(server.classify_playit(True, False), ("degraded", "PLAYIT: TUNEL NIE ODPOWIADA"))
+        self.assertEqual(server.classify_playit(True, None), ("unknown", "PLAYIT: BRAK TESTU"))
+
     def test_heightmap_unpacking(self):
         values = list(range(256))
         bits, per_long = 9, 64 // 9

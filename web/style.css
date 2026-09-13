@@ -469,6 +469,16 @@ body.crt-scanlines::after {
   box-shadow: 0 0 25px rgba(0, 240, 255, 0.6);
 }
 
+.playit-control {
+  display: grid;
+  gap: 6px;
+}
+
+.playit-control .cyber-btn {
+  width: 100%;
+  min-height: 44px;
+}
+
 .btn-playit {
   border-color: var(--neon-amber);
   color: var(--neon-amber);
@@ -478,6 +488,34 @@ body.crt-scanlines::after {
   color: #000;
   box-shadow: 0 0 25px rgba(255, 184, 0, 0.6);
 }
+
+.playit-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 20px;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.playit-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.playit-status.online { color: var(--neon-green); }
+.playit-status.degraded { color: var(--neon-amber); }
+.playit-status.offline { color: var(--neon-red); }
+.playit-status.unknown,
+.playit-status.checking { color: var(--text-dim); }
 
 .btn-stop {
   border-color: var(--neon-red);

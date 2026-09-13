@@ -22,6 +22,7 @@ import time
 import zipfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 
 from terrain import terrain_grid
 
@@ -63,6 +64,8 @@ MAX_MOD_BYTES = 256 * 1024 * 1024
 MOD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+() -]{0,179}\.jar$", re.IGNORECASE)
 RESOURCE_ID_RE = re.compile(r"^[a-z0-9_.-]+:[a-z0-9_./-]+$")
 PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{1,16}$")
+PLAYIT_STATUS_URL = "https://api.mcstatus.io/v2/status/java/grzybkowo.minecraft.party"
+PLAYIT_CHECK_INTERVAL = 60
 upload_lock = threading.Lock()
 terrain_lock = threading.Lock()
 
@@ -173,8 +176,11 @@ telemetry_lock = threading.Lock()
 telemetry_data = {
     "system": {},
     "minecraft": {},
+    "playit": {"state": "checking", "label": "PLAYIT: SPRAWDZANIE...", "checked_at": 0},
     "timestamp": 0
 }
+_playit_last_check = 0.0
+_playit_status = dict(telemetry_data["playit"])
 
 # Chat tracking & parser
 admin_chat_messages = []
@@ -499,6 +505,53 @@ def get_minecraft_status():
 
     return status
 
+def classify_playit(agent_active, public_online):
+    if not agent_active:
+        return "offline", "PLAYIT: WYŁĄCZONY"
+    if public_online is True:
+        return "online", "PLAYIT: ONLINE"
+    if public_online is False:
+        return "degraded", "PLAYIT: TUNEL NIE ODPOWIADA"
+    return "unknown", "PLAYIT: BRAK TESTU"
+
+
+def get_playit_status():
+    global _playit_last_check, _playit_status
+    now = time.monotonic()
+    if now - _playit_last_check < PLAYIT_CHECK_INTERVAL:
+        return dict(_playit_status)
+
+    public_online = None
+    detail = ""
+    try:
+        agent_active = subprocess.run(
+            ["systemctl", "is-active", "--quiet", "playit.service"],
+            timeout=2.0,
+        ).returncode == 0
+    except Exception:
+        agent_active = False
+
+    if agent_active:
+        try:
+            request = Request(PLAYIT_STATUS_URL, headers={"User-Agent": "GrzybkowoDashboard/1.0"})
+            with urlopen(request, timeout=5.0) as response:
+                public_online = bool(json.load(response).get("online"))
+        except Exception as error:
+            detail = type(error).__name__
+
+    state, label = classify_playit(agent_active, public_online)
+    _playit_status = {
+        "state": state,
+        "label": label,
+        "agent_active": agent_active,
+        "public_online": public_online,
+        "checked_at": time.time(),
+        "detail": detail,
+    }
+    _playit_last_check = now
+    return dict(_playit_status)
+
+
 def run_sudo_cmd(args):
     """Executes a command with sudo, feeding password via stdin."""
     full_cmd = ["sudo", "-S"] + args
@@ -564,6 +617,7 @@ def telemetry_poller():
             mem = get_memory_info()
             disk = get_disk_info()
             mc = get_minecraft_status()
+            playit = get_playit_status()
 
             # Check for new player joins and trigger welcome rules
             current_players = set(mc.get("players", {}).get("list", []))
@@ -603,6 +657,7 @@ def telemetry_poller():
                     "uptime": uptime_str
                 }
                 telemetry_data["minecraft"] = mc
+                telemetry_data["playit"] = playit
                 telemetry_data["timestamp"] = time.time()
         except Exception as e:
             print(f"[Telemetry Worker Error] {e}", file=sys.stderr)
@@ -891,6 +946,8 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             if action == "restart_playit":
                 code, stdout, stderr = run_sudo_cmd(["systemctl", "restart", "playit.service"])
                 if code == 0:
+                    global _playit_last_check
+                    _playit_last_check = 0.0
                     self.send_json({"success": True, "message": "Tunel Playit został zrestartowany.", "output": stdout})
                 else:
                     self.send_json({"success": False, "message": "Nie udało się zrestartować tunelu Playit.", "error": stderr}, 500)

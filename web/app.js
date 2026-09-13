@@ -502,6 +502,16 @@ function renderTelemetry(data) {
   const mcText = document.getElementById('mcStatusText');
   const btnStart = document.getElementById('btnStart');
   const btnStop = document.getElementById('btnStop');
+  const playit = data.playit || {};
+  const playitStatus = document.getElementById('playitStatus');
+  const playitStatusText = document.getElementById('playitStatusText');
+
+  if (playitStatus && playitStatusText) {
+    const state = ['online', 'degraded', 'offline', 'unknown'].includes(playit.state) ? playit.state : 'checking';
+    const label = playit.label || 'PLAYIT: SPRAWDZANIE...';
+    playitStatus.className = `playit-status ${state}`;
+    if (playitStatusText.textContent !== label) playitStatusText.textContent = label;
+  }
 
   if (mc.active) {
     mcBadge.textContent = 'RUNNING';
