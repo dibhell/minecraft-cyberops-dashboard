@@ -1412,6 +1412,29 @@ async function toggleWeatherCycle(enable) {
   }
 }
 
+async function sendServerRules(target = '@a') {
+  playCyberSound('click');
+  appendConsoleDirect(`[REGULAMIN] Wysyłanie zasad do: ${target}...`, 'special');
+  try {
+    const res = await fetch('/api/rules/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target })
+    });
+    const data = await res.json();
+    if (data.message) {
+      showToast(data.message);
+      appendConsoleDirect(`[SERVER <<] ${data.message}`, 'info');
+    } else if (data.error) {
+      showToast(`Błąd: ${data.error}`);
+      appendConsoleDirect(`[BŁĄD] ${data.error}`, 'error');
+    }
+  } catch (err) {
+    appendConsoleDirect(`[BŁĄD SIECI] ${err.message}`, 'error');
+    showToast(`Błąd sieci: ${err.message}`);
+  }
+}
+
 function startWhisperTo(player) {
   selectedChatMode = 'whisper';
   document.querySelectorAll('.mode-chip').forEach(c => {

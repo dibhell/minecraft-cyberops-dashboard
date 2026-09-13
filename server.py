@@ -33,7 +33,14 @@ DEFAULT_CONFIG = {
     "auth_user": "admin",
     "auth_password": "",
     "mom_user": "mama",
-    "mom_password": ""
+    "mom_password": "",
+    "welcome_rules_enabled": True,
+    "welcome_rules": [
+        "Szanujemy bazy: nie niszczymy cudzych budowli i nie kradniemy.",
+        "PvP i broń (TACZ): nie strzelamy bez wcześniejszego umówienia się!",
+        "Pomoc i klimat: pomagamy sobie nawzajem i gramy fair play.",
+        "W razie pytań lub kłopotów napisz do Admina na czacie."
+    ]
 }
 
 _cfg = dict(DEFAULT_CONFIG)
@@ -507,8 +514,48 @@ def run_sudo_cmd(args):
     stderr_clean = re.sub(r'\[sudo\] password for .*?:\s*', '', stderr).strip()
     return p.returncode, stdout.strip(), stderr_clean
 
+def send_player_rules(player_name, delay=3.5):
+    """Sends server rules to a joining player via RCON after a brief delay."""
+    if player_name != "@a" and not PLAYER_RE.fullmatch(player_name):
+        return
+
+    def _worker():
+        if delay > 0:
+            time.sleep(delay)
+        try:
+            rcon_command(f"playsound minecraft:block.note_block.chime master {player_name} ~ ~ ~ 1 1")
+            rcon_command(f'title {player_name} actionbar {{"text":"📜 Witaj na serwerze! Zapoznaj się z regulaminem","color":"gold"}}')
+
+            border = '{"text":"══════════════════════════════════════════════","color":"gold","bold":true}'
+            rcon_command(f"tellraw {player_name} {border}")
+            rcon_command(f'tellraw {player_name} [{{"text":" 📜 ","color":"yellow"}},{{"text":"REGULAMIN SERWERA GRZYBKOWO","color":"gold","bold":true}}]')
+            rcon_command(f'tellraw {player_name} {{"text":""}}')
+
+            rules = _cfg.get("welcome_rules") or DEFAULT_CONFIG["welcome_rules"]
+            icons = ["🛡️", "⚔️", "🤝", "💬", "⭐", "📌"]
+            colors = ["aqua", "red", "green", "light_purple", "yellow", "white"]
+
+            for idx, rule in enumerate(rules, 1):
+                icon = icons[(idx - 1) % len(icons)]
+                color = colors[(idx - 1) % len(colors)]
+                rule_escaped = json.dumps(rule, ensure_ascii=False)
+                cmd = f'tellraw {player_name} [{{"text":"  {idx}. {icon} ","color":"{color}"}},{{"text":{rule_escaped},"color":"white"}}]'
+                rcon_command(cmd)
+                time.sleep(0.12)
+
+            rcon_command(f'tellraw {player_name} {{"text":""}}')
+            rcon_command(f"tellraw {player_name} {border}")
+        except Exception as err:
+            print(f"[Welcome Rules Error] {err}", file=sys.stderr)
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+_last_seen_players = set()
+_poller_initialized = False
+
 def telemetry_poller():
     """Background thread polling telemetry every 1.5 seconds"""
+    global _last_seen_players, _poller_initialized
     while True:
         try:
             cpu = get_cpu_percent()
@@ -517,6 +564,17 @@ def telemetry_poller():
             mem = get_memory_info()
             disk = get_disk_info()
             mc = get_minecraft_status()
+
+            # Check for new player joins and trigger welcome rules
+            current_players = set(mc.get("players", {}).get("list", []))
+            if _poller_initialized:
+                newly_joined = current_players - _last_seen_players
+                if _cfg.get("welcome_rules_enabled", True):
+                    for new_player in newly_joined:
+                        send_player_rules(new_player, delay=3.5)
+            else:
+                _poller_initialized = True
+            _last_seen_players = current_players
             
             # Load averages
             load_1, load_5, load_15 = os.getloadavg()
@@ -908,6 +966,15 @@ class CyberHandler(http.server.BaseHTTPRequestHandler):
             response = rcon_command(cmd)
             failed = any(word in response.lower() for word in ("error", "failed", "unable", "błąd rcon", "not configured"))
             self.send_json({"success": not failed, "response": response, "command": cmd})
+            return
+
+        elif path == "/api/rules/send":
+            target = str(data.get("target", "@a")).strip() or "@a"
+            if target != "@a" and not PLAYER_RE.fullmatch(target):
+                self.send_error_json("Nieprawidłowy odbiorca (musi być nick gracza lub @a).")
+                return
+            send_player_rules(target, delay=0.0)
+            self.send_json({"success": True, "message": f"Wysłano regulamin do: {target}"})
             return
 
         elif path == "/api/rcon":

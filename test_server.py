@@ -70,6 +70,12 @@ class ModUploadValidationTest(unittest.TestCase):
         self.assertFalse(server.PLAYER_RE.fullmatch("too_long_nickname_exceeding_16"))
         self.assertFalse(server.PLAYER_RE.fullmatch("evil;drop"))
 
+    def test_welcome_rules_config_and_target(self):
+        self.assertTrue(server.DEFAULT_CONFIG.get("welcome_rules_enabled"))
+        self.assertGreaterEqual(len(server.DEFAULT_CONFIG.get("welcome_rules", [])), 3)
+        # Invalid player names should be rejected by send_player_rules
+        server.send_player_rules("invalid;nick", delay=0.0)
+
 
 
 if __name__ == "__main__":
